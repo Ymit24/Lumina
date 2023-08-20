@@ -4,10 +4,10 @@ fn main() {
     static PI := 3.14 + 2 + 5;
     const radius := 20;
     var area := PI;
-    printf("sum=%d\n", area + 2 + 5);
+    puts("sum=%d\n", 2 + 5);
     return;
 }
 
-fn getNum(a: i32): i32 {
+fn getNum(a: i32): f32 {
     return 2 + 1 - 3 + 10;
 }

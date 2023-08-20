@@ -15,12 +15,19 @@ var mod *ir.Module
 var functionStack stack.Stack
 var blockStack stack.Stack
 
+var functionDeclarations map[string]*ir.Func
+
 func (p *Program) Visit() error {
 	mod = ir.NewModule()
+
+	functionDeclarations = make(map[string]*ir.Func)
+
 	for _, stmt := range p.Statements {
 		stmt.Visit()
 	}
+
 	fmt.Printf("Module:\n%s\n", mod.String())
+
 	return nil
 }
 
@@ -61,11 +68,14 @@ func (sig *FunctionSignature) Visit() *ir.Func {
 			ir.NewParam(arg.Name, argType),
 		)
 	}
-	return mod.NewFunc(
+	funcDecl := mod.NewFunc(
 		name,
 		returnType,
 		params...,
 	)
+
+	functionDeclarations[name] = funcDecl
+	return funcDecl
 }
 
 func (stmt *Function) Visit() {
@@ -112,6 +122,11 @@ func (term *Term) Visit() value.Value {
 		lit := *term.Factor.Literal
 		if lit.Number != nil {
 			return constant.NewFloat(types.Float, *lit.Number)
+		} else if lit.String != nil {
+			return constant.NewCharArrayFromString(*lit.String)
+		} else if lit.Ident != nil {
+			// TODO: REPLACE THIS WITH ACTUAL LOOK UP
+			return constant.NewCharArrayFromString(*lit.Ident)
 		}
 		CompileError(
 			term.Factor.Literal.Pos,
@@ -138,15 +153,33 @@ func (expr *Expression) Visit() value.Value {
 		}
 		right := expr.Next.Visit()
 		if *expr.AddSub == "+" {
-			return cBlock.NewAdd(
-				left,
-				right,
-			)
+			leftIsFloat := types.IsFloat(left.Type())
+			rightIsFloat := types.IsFloat(right.Type())
+			if leftIsFloat || rightIsFloat {
+				return cBlock.NewFAdd(
+					left,
+					right,
+				)
+			} else {
+				return cBlock.NewAdd(
+					left,
+					right,
+				)
+			}
 		} else if *expr.AddSub == "-" {
-			return cBlock.NewSub(
-				left,
-				right,
-			)
+			leftIsFloat := types.IsFloat(left.Type())
+			rightIsFloat := types.IsFloat(right.Type())
+			if leftIsFloat || rightIsFloat {
+				return cBlock.NewFSub(
+					left,
+					right,
+				)
+			} else {
+				return cBlock.NewSub(
+					left,
+					right,
+				)
+			}
 		} else {
 			CompileError(
 				expr.Pos,
@@ -177,8 +210,31 @@ func (expr *Expression) Visit() value.Value {
 	*/
 }
 
-func (stmt *FunctionCall) Visit() {
+func (stmt *FunctionCall) Visit() value.Value {
 	fmt.Printf("Found function call for function: %s\n", stmt.FunctionName)
+	cBlock := blockStack.Peek().(*ir.Block)
+
+	funcDecl, ok := functionDeclarations[stmt.FunctionName]
+	if !ok {
+		CompileError(
+			stmt.Pos,
+			fmt.Errorf("Unknown function %s!", stmt.FunctionName),
+		)
+	}
+
+	if len(stmt.Args) != 0 {
+		var argExprs []value.Value
+		for _, arg := range stmt.Args {
+			argExprs = append(argExprs, arg.Visit())
+		}
+		return cBlock.NewCall(
+			funcDecl,
+			argExprs...,
+		)
+	}
+	return cBlock.NewCall(
+		funcDecl,
+	)
 }
 func (stmt *VariableAssignment) Visit() {
 	fmt.Printf(
@@ -192,10 +248,11 @@ func (stmt *Return) Visit() {
 	cBlock := blockStack.Peek().(*ir.Block)
 
 	if stmt.Expression != nil {
-		stmt.Expression.Visit()
+		val := stmt.Expression.Visit()
+		cBlock.NewRet(val)
+	} else {
+		cBlock.NewRet(nil)
 	}
-
-	cBlock.NewRet(nil)
 }
 
 func CompileError(pos lexer.Position, err error) {

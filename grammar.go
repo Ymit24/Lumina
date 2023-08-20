@@ -63,7 +63,7 @@ type VariableAssignment struct {
 type FunctionCall struct {
 	Pos          lexer.Position
 	FunctionName string       `@Ident`
-	Args         []Expression `LParen @@ (Comma @@)* RParen`
+	Args         []Expression `LParen ( @@ (Comma @@)* )? RParen`
 }
 type Expression struct {
 	Pos    lexer.Position
