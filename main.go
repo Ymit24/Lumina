@@ -2,52 +2,48 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/alecthomas/participle/v2"
+	"github.com/alecthomas/participle/v2/lexer"
 	"github.com/kr/pretty"
 )
 
-type Query struct {
-	Fields []*Field `@@*`
-}
-
-type Field struct {
-	Key   string `@Ident "="`
-	Op    string `@("=" | "<" "=" | "<" | ">" "=" | ">" )`
-	Value *Value `@@`
-}
-
-type Value struct {
-	Number *float64 ` @Float | @Int`
-	String *string  `| @String`
-	Bool   *bool    `| ( @"true" | @"false" )`
-	Nil    bool     `| @"nil"`
-}
-
-var parser = participle.MustBuild[Query](
-	participle.Unquote("String"),
-)
-
-func ParseQuery(q string) (*Query, error) {
-	var expr *Query
-
-	expr, err := parser.ParseString("", q)
-	if err != nil {
-		return nil, err
-	}
-	return expr, nil
-}
-
 func main() {
-	q, err := ParseQuery(`a=100 price < 20 available >= 200`)
+	lexer := lexer.MustSimple([]lexer.SimpleRule{
+		{"Ident", `[a-zA-Z]\w*`},
+		{"Number", `[-+]?(\d*\.)?\d+`},
+		{"Dot", `\.`},
+		{"String", `\"(?:[^\"]|\\.)*\"`},
+		{"Whitespace", `[ \t\n]+`},
+		{"LParen", `\(`},
+		{"RParen", `\)`},
+		{"LBrace", `{`},
+		{"RBrace", `}`},
+		{"Colon", `:`},
+		{"Comma", `,`},
+		{"True", `true`},
+		{"False", `false`},
+		{"Semicolon", `;`},
+	})
+	parser := participle.MustBuild[Program](
+		participle.Elide("Whitespace"),
+		participle.Lexer(lexer),
+	)
 
+	bytes, err := os.ReadFile("first.la")
 	if err != nil {
-		fmt.Printf("Error: %s", err.Error())
-	} else {
-		fmt.Printf("Query: %# v", pretty.Formatter(q))
+		panic(err)
 	}
 
-	for _, field := range q.Fields {
-		fmt.Printf("Field: '%s': Value: %#v\n", field.Key, field.Value)
+	contents := string(bytes)
+	fmt.Printf("File: ```%s```\n", contents)
+
+	program, err := parser.ParseString("", contents)
+
+	if err != nil {
+		fmt.Printf("Error: %s\n", err.Error())
+	} else {
+		fmt.Printf("Query: %# v\n", pretty.Formatter(program))
 	}
 }

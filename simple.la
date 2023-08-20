@@ -1,0 +1,26 @@
+extern void [T] printf(fmt: string, args: ...[T]);
+
+muta asdf = 123;
+comp asdf3 = 222 // infers i32
+imut asdf2 = asdf + 2;
+
+Failable(i32) fact(n: i32) {
+    if n < 0 { return Failable(i32)::from("Invalid number for factorial!")); }
+    return n * fact(n-1), nil
+}
+
+/*
+    enum Result[T] {
+        Ok(T)
+        Err(Error)
+    }
+
+    enum Shape {
+        Circle(struct { radius: f32 }),
+        Rectangle(struct { radius: f32 }),
+    }
+*/
+
+void main() {
+    printf("Hello %s!", "world") // Prints: `Hello world!`
+}

@@ -1,0 +1,94 @@
+i32 main(
+    argc: i32,
+    argv: [string]
+) {
+    // ...
+}
+
+struct Complex[X, Y, Z] {
+    x: X,
+    y: Y,
+    z: Z
+}
+
+Complex(i32, Complex(i32, i32, i32), string) getSomeComplex() {
+}
+
+(Point(T), Error) [T: Number] GetPoint (x: T, y: T) {
+    return Point(T) {
+        x, y
+    }
+}
+
+void Printf(fmt: string, args: ...[string]) {}
+
+enum Shape {
+    Circle(radius: f32),
+    Rect(width: f32, height: f32),
+}
+
+enum Simple {
+    Red,
+    Green,
+    Blue
+}
+
+struct FileInfo(
+    path: string,
+    extension: string,
+    isCool: bool,
+);
+
+void doSomeStuff() {
+    struct TempStruct[T](x: f32, y: i32);
+
+    let temp := TempStruct {
+        x: 123,
+        y: 22,
+    }
+}
+
+(f32, Error) Shape::Area() {
+    case self.Type {
+        .Circle { radius: _rad } : {
+            return _rad ** 2 * math::PI
+        }
+        .Rect { width, height } : {
+            return width * height
+        }
+        default: {
+            return -1, Error::from_string(
+                "Unhandled shape found: {}",
+                self.Type,
+            )
+        }
+    }
+}
+
+// UI
+
+void main() {
+    void (str: string) { std::println(str); }("inline call!")
+
+    let app := App {
+        root: Column {
+            Text {
+                "My cool app",
+                variant: .h2
+            },
+            Button {
+                Text {
+                    "Click me!"
+                },
+                onClick: void () {
+                    std::println("Clicked!")
+                },
+            },
+            Row {
+                Image {
+                    src: "https://some.image"
+                }
+            }
+        }
+    }
+}
