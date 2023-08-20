@@ -67,13 +67,13 @@ type FunctionCall struct {
 }
 type Expression struct {
 	Pos    lexer.Position
-	Term   *Term       `@@`
+	Term   Term        `@@`
 	AddSub *string     `[ @(Plus | Minus)`
 	Next   *Expression `@@ ]`
 }
 type Term struct {
 	Pos    lexer.Position
-	Factor *Value  `@@`
+	Factor Value   `@@`
 	MulDiv *string `[ @(Asterisk | FSlash)`
 	Next   *Term   `@@ ]`
 }

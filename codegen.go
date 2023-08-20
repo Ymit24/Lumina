@@ -6,7 +6,9 @@ import (
 	"github.com/alecthomas/participle/v2/lexer"
 	"github.com/golang-collections/collections/stack"
 	"github.com/llir/llvm/ir"
+	"github.com/llir/llvm/ir/constant"
 	"github.com/llir/llvm/ir/types"
+	"github.com/llir/llvm/ir/value"
 )
 
 var mod *ir.Module
@@ -99,7 +101,80 @@ func (stmt *Statement) Visit() {
 	}
 }
 
-func (expr *Expression) Visit() {
+type ExpressionStep struct {
+	Identifier string     // The %2
+	Type       types.Type // the 'float', 'i32, etc..
+}
+
+func (term *Term) Visit() value.Value {
+	// TODO: code gen factor independently
+	if term.Factor.Literal != nil {
+		lit := *term.Factor.Literal
+		if lit.Number != nil {
+			return constant.NewFloat(types.Float, *lit.Number)
+		}
+		CompileError(
+			term.Factor.Literal.Pos,
+			fmt.Errorf("Unimplemented literal. Found: %# v", lit),
+		)
+	}
+	CompileError(
+		term.Factor.Pos,
+		fmt.Errorf("Unimplemented factor."),
+	)
+	return nil
+}
+
+func (expr *Expression) Visit() value.Value {
+	cBlock := blockStack.Peek().(*ir.Block)
+	left := expr.Term.Visit()
+	if expr.AddSub != nil {
+		// NOTE: For NOW, addition is between ints or floats
+		if expr.Next == nil {
+			CompileError(
+				expr.Pos,
+				fmt.Errorf("No next expression in add/sub expression!"),
+			)
+		}
+		right := expr.Next.Visit()
+		if *expr.AddSub == "+" {
+			return cBlock.NewAdd(
+				left,
+				right,
+			)
+		} else if *expr.AddSub == "-" {
+			return cBlock.NewSub(
+				left,
+				right,
+			)
+		} else {
+			CompileError(
+				expr.Pos,
+				fmt.Errorf("Unrecognized addsub operator: %s", *expr.AddSub),
+			)
+		}
+	} else {
+		return left
+	}
+	CompileError(
+		expr.Pos,
+		fmt.Errorf("Unimplemented"),
+	)
+	return nil
+	/*
+	   entry:
+	   %1 = alloca float
+	   %2 = fadd float 3.14, float 2
+	   %3 = fdiv float 1, float 1
+	   %4 = fmul float 5, float %3
+	   %5 = fsub 2, %4
+
+	   store float %5, float* %1
+
+	   entry:
+	   %1 = alloca float
+	   store float 0.14, float* %1
+	*/
 }
 
 func (stmt *FunctionCall) Visit() {
@@ -116,7 +191,9 @@ func (stmt *Return) Visit() {
 	fmt.Printf("Found return.\n")
 	cBlock := blockStack.Peek().(*ir.Block)
 
-	stmt.Expression.Visit()
+	if stmt.Expression != nil {
+		stmt.Expression.Visit()
+	}
 
 	cBlock.NewRet(nil)
 }
