@@ -1,0 +1,21 @@
+extern fn printf(fmt: string): i32;
+
+fn main() {
+    printf("Hello world!");
+    printf("Hello world again!");
+}
+
+fn getSum(a: i32 @static, b: i32): i32 {
+    static {
+        if a < 5 {
+            @compileError("A must be above 5. A was: %s", a);
+        }
+    }
+    return a + b;
+}
+
+fn getSumFullyStatic(a: i32 @static, b: i32 @static): i32 {
+    return static i32 {
+        return a + b;
+    }
+}

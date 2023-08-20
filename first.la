@@ -1,6 +1,6 @@
-extern i32 printf(fmt: string);
-
-void main() {printf("Hello world!");}
-
-i32 add(a: i32, b: i32) {  }
-Complex(i32, Complex(f32)) getSomething(a: Complex(f32)) {  }
+fn main() {
+    static PI := 3.14;
+    const radius := 20;
+    var area := PI * radius * radius;
+    printf("sum=%d\n", area + 2 * 3 + 5);
+}
