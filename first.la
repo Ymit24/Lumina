@@ -1,6 +1,13 @@
+extern fn puts(str: i8): i32;
+
 fn main() {
     static PI := 3.14;
     const radius := 20;
     var area := PI * radius * radius;
-    printf("sum=%d\n", area + 2 * 3 + 5);
+    printf("sum=%d\n", area + 2 * getNum(2+radius) + 5);
+    return;
+}
+
+fn getNum(a: i32): i32 {
+    return a + 1;
 }

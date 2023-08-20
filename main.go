@@ -34,4 +34,11 @@ func main() {
 	} else {
 		fmt.Printf("Query: %# v\n", pretty.Formatter(program))
 	}
+
+	fmt.Println("Visiting")
+
+	err = program.Visit()
+	if err != nil {
+		fmt.Printf("Failed to visit program: %s\n", err.Error())
+	}
 }

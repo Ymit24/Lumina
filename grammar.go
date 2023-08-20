@@ -9,7 +9,7 @@ type Program struct {
 
 type HighLevelStatement struct {
 	Pos      lexer.Position
-	Extern   Extern    `@@`
+	Extern   *Extern   `@@`
 	Function *Function `| @@`
 }
 
