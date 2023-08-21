@@ -112,7 +112,7 @@ var luminaLexer = lexer.MustSimple([]lexer.SimpleRule{
 	{"Const", `const`},
 	{"Var", `var`},
 	{"Return", `return`},
-	{"Number", `[-+]?(\d*\.)?\d+`},
+	{"Number", `(\d*\.)?\d+`},
 	{"Dot", `\.`},
 	{"String", `\"(?:[^\"]|\\.)*\"`},
 	{"Whitespace", `[ \t\n]+`},

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/alecthomas/participle/v2/lexer"
@@ -158,6 +159,9 @@ func (c *CodeGenerator) VisitTerm(term *Term) value.Value {
 	if term.Factor.Literal != nil {
 		lit := *term.Factor.Literal
 		if lit.Number != nil {
+			if *lit.Number == math.Trunc(*lit.Number) {
+				return constant.NewInt(types.I32, int64(*lit.Number))
+			}
 			return constant.NewFloat(types.Float, *lit.Number)
 		} else if lit.String != nil {
 			fmt.Printf("Found string constant: `%s`\n", *lit.String)
@@ -195,7 +199,14 @@ func (c *CodeGenerator) VisitExpression(expr *Expression) value.Value {
 		if *expr.AddSub == "+" {
 			leftIsFloat := types.IsFloat(left.Type())
 			rightIsFloat := types.IsFloat(right.Type())
+			fmt.Printf("Is Float: %t, %t\n", leftIsFloat, rightIsFloat)
 			if leftIsFloat || rightIsFloat {
+				if !leftIsFloat {
+					left = cBlock.NewBitCast(left, types.Float)
+				}
+				if !rightIsFloat {
+					right = cBlock.NewBitCast(right, types.Float)
+				}
 				return cBlock.NewFAdd(
 					left,
 					right,

@@ -1,10 +1,10 @@
 extern fn printf(fmt: ...[i8]): i32;
 
 fn main() {
-    printf("sum=%1.1f\nsecond=%2.2f\n", 10.0, 2 + 2);
+    printf("sum=%d\nsecond=%1.2f\n", 10.0, 2.2+2);
     return;
 }
 
-fn getNum(a: i32): f32 {
+fn getNum(a: i32): i32 {
     return 2 + 1 - 3 + 10;
 }
