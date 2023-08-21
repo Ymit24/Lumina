@@ -1,7 +1,8 @@
 extern fn printf(fmt: ...[i8]): i32;
 
 fn main() {
-    printf("sum=%d\nsecond=%1.2f\n", 10.0, 2.2+2);
+    var a := 4 + 4.5;
+    printf("sum=%2.2f\nsecond=%1.2f\n", a, 2.2+2);
     return;
 }
 

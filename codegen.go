@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"math"
 	"strings"
 
 	"github.com/alecthomas/participle/v2/lexer"
@@ -159,18 +158,25 @@ func (c *CodeGenerator) VisitTerm(term *Term) value.Value {
 	if term.Factor.Literal != nil {
 		lit := *term.Factor.Literal
 		if lit.Number != nil {
-			if *lit.Number == math.Trunc(*lit.Number) {
-				return constant.NewInt(types.I32, int64(*lit.Number))
+			if lit.IsFloat() {
+				return constant.NewFloat(types.Float, *lit.Number)
 			}
-			return constant.NewFloat(types.Float, *lit.Number)
+			return constant.NewInt(types.I32, int64(*lit.Number))
 		} else if lit.String != nil {
-			fmt.Printf("Found string constant: `%s`\n", *lit.String)
-			constValue := constant.NewCharArrayFromString(fixString(*lit.String) + "\x00")
+			constValue := constant.NewCharArrayFromString(
+				fixString(*lit.String) + "\x00",
+			)
 			gblDef := c.module.NewGlobalDef("fmt", constValue)
 			return gblDef
 		} else if lit.Ident != nil {
-			// TODO: REPLACE THIS WITH ACTUAL LOOK UP
-			return constant.NewCharArrayFromString(*lit.Ident)
+			variable, ok := c.currentScope().Variables[*lit.Ident]
+			if !ok {
+				CompileError(
+					lit.Pos,
+					fmt.Errorf("Variable `%s` not found in scope!", *lit.Ident),
+				)
+			}
+			return c.currentBlock().NewLoad(variable.Type, variable.Address)
 		}
 		CompileError(
 			term.Factor.Literal.Pos,
@@ -199,7 +205,6 @@ func (c *CodeGenerator) VisitExpression(expr *Expression) value.Value {
 		if *expr.AddSub == "+" {
 			leftIsFloat := types.IsFloat(left.Type())
 			rightIsFloat := types.IsFloat(right.Type())
-			fmt.Printf("Is Float: %t, %t\n", leftIsFloat, rightIsFloat)
 			if leftIsFloat || rightIsFloat {
 				if !leftIsFloat {
 					left = cBlock.NewBitCast(left, types.Float)
@@ -280,9 +285,31 @@ func (c *CodeGenerator) VisitVariableAssignment(stmt *VariableAssignment) {
 		stmt.Name,
 	)
 
-	fmt.Printf("%# v\n", stmt)
+	var llvmType types.Type
+	var err error
 
-	vType, err := GetLLVMType(*stmt.Type)
+	fmt.Printf("%# v\n", stmt)
+	if stmt.Type == nil {
+		// NOTE: Try type inference
+		llvmType, err = stmt.Expression.GetType()
+		if err != nil {
+			CompileError(
+				stmt.Pos,
+				fmt.Errorf(
+					"Unable to infer type of expression for "+
+						"variable assignment. Error: %s",
+					err.Error(),
+				),
+			)
+		}
+		fmt.Printf(
+			"\nType Inference returned: %# v for %# v\n\n",
+			llvmType,
+			pretty.Formatter(stmt.Expression),
+		)
+	} else {
+		llvmType, err = GetLLVMType(*stmt.Type)
+	}
 	if err != nil {
 		CompileError(stmt.Pos, err)
 	}
@@ -294,11 +321,11 @@ func (c *CodeGenerator) VisitVariableAssignment(stmt *VariableAssignment) {
 		)
 	}
 
-	alloc := c.currentBlock().NewAlloca(vType)
+	alloc := c.currentBlock().NewAlloca(llvmType)
 	variable := Variable{
 		Name:       stmt.Name,
 		Mutability: stmt.Mutability,
-		Type:       vType,
+		Type:       llvmType,
 		Address:    alloc,
 	}
 
@@ -315,6 +342,9 @@ func (c *CodeGenerator) VisitVariableAssignment(stmt *VariableAssignment) {
 	}
 
 	exprResult := c.VisitExpression(&stmt.Expression)
+	if exprResult.Type() != alloc.ElemType {
+		exprResult = c.currentBlock().NewBitCast(exprResult, alloc.ElemType)
+	}
 	c.currentBlock().NewStore(exprResult, alloc)
 }
 func (c *CodeGenerator) VisitReturn(stmt *Return) {
