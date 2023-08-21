@@ -9,17 +9,20 @@ import (
 )
 
 func main() {
+	fmt.Println("Lumina Compiler")
 	parser := participle.MustBuild[Program](
 		participle.Elide("Whitespace"),
 		participle.Lexer(luminaLexer),
 	)
 
-	if len(os.Args) != 2 {
-		panic("Expected lumina file to be passed in!")
+	if len(os.Args) != 3 {
+		panic("Expected lumina file to be passed in and output binary name!")
 	}
-	filename := os.Args[1]
+	inputFilename := os.Args[1]
+	outputFilename := os.Args[2]
 
-	bytes, err := os.ReadFile(filename)
+	fmt.Println("Reading source file")
+	bytes, err := os.ReadFile(inputFilename)
 	if err != nil {
 		panic(err)
 	}
@@ -27,7 +30,7 @@ func main() {
 	contents := string(bytes)
 	fmt.Printf("File: ```%s```\n", contents)
 
-	program, err := parser.ParseString(filename, contents, participle.Trace(os.Stdout))
+	program, err := parser.ParseString(inputFilename, contents, participle.Trace(os.Stdout))
 
 	if err != nil {
 		fmt.Printf("Error: %s\n", err.Error())
@@ -37,8 +40,13 @@ func main() {
 
 	fmt.Println("Visiting")
 
-	err = program.Visit()
-	if err != nil {
-		fmt.Printf("Failed to visit program: %s\n", err.Error())
-	}
+	codeGenerator := CodeGenerator{}
+
+	code := codeGenerator.VisitProgram(program)
+
+	os.WriteFile(
+		outputFilename,
+		[]byte(code),
+		0644,
+	)
 }

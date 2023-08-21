@@ -31,10 +31,21 @@ type Function struct {
 	Block     CodeBlock         `@@`
 }
 type Type struct {
+	Pos   lexer.Position
+	Array *ArrayType `@@`
+	Inner *InnerType `| @@`
+}
+type InnerType struct {
 	Pos              lexer.Position
 	Name             string  `@Ident`
 	GenericArguments []*Type `( LParen ( @@ ( Comma @@ )* ) RParen )?`
 }
+type ArrayType struct {
+	Pos      lexer.Position
+	IsSpread bool `@Ellipsis?`
+	Type     Type `LBracket @@ RBracket`
+}
+
 type CodeBlock struct {
 	Pos        lexer.Position
 	Statements []Statement `LBrace ( @@ )* RBrace`
@@ -94,6 +105,7 @@ type Literal struct {
 }
 
 var luminaLexer = lexer.MustSimple([]lexer.SimpleRule{
+	{"Ellipsis", `\.\.\.`},
 	{"Fn", `fn`},
 	{"Extern", `extern`},
 	{"Static", `static`},
@@ -106,6 +118,8 @@ var luminaLexer = lexer.MustSimple([]lexer.SimpleRule{
 	{"Whitespace", `[ \t\n]+`},
 	{"LParen", `\(`},
 	{"RParen", `\)`},
+	{"LBracket", `\[`},
+	{"RBracket", `\]`},
 	{"LBrace", `{`},
 	{"RBrace", `}`},
 	{"Colon", `:`},

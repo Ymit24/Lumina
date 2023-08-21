@@ -19,10 +19,25 @@ var PrimativeTypes = map[string]types.Type{
 }
 
 func GetLLVMType(raw Type) (types.Type, error) {
-	typeName := raw.Name
-	primative, ok := PrimativeTypes[typeName]
-	if ok {
-		return primative, nil
+	if raw.Array != nil {
+		inner, err := GetLLVMType(raw.Array.Type)
+		if err != nil {
+			return nil, err
+		}
+		return types.NewPointer(inner), nil
 	}
-	return nil, fmt.Errorf("Type: `%# v` is not implemented!", raw)
+	var typeName string
+	if raw.Inner != nil {
+		typeName = raw.Inner.Name
+	} else {
+		CompileError(raw.Pos, fmt.Errorf("No inner type!"))
+	}
+	primative, ok := PrimativeTypes[typeName]
+	if !ok {
+		return nil, fmt.Errorf("Type: `%# v` is not implemented!", raw)
+	}
+	if raw.Array != nil {
+		return types.NewPointer(primative), nil
+	}
+	return primative, nil
 }

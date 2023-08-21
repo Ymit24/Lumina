@@ -1,5 +1,5 @@
 build_and_run_example: build run_example
 build:
-	go build -o lumina main.go grammar.go codegen.go types.go
+	go build .
 run_example:
-	./lumina first.la
+	./lumina first.la first.ll
