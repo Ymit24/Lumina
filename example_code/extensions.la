@@ -1,12 +1,11 @@
-import std;
+import { String } from std;
 
 extension Logger {
-    fn log(msg: std::string);
+    fn log(msg: String);
 }
 
-
 struct AppLogger {
-    out: stream(string);
+    out: std::stream<String>;
 }
 
 extend AppLogger {
@@ -14,7 +13,7 @@ extend AppLogger {
 }
 
 extend AppLogger with Logger {
-    fn log(&self, msg: string) {
+    fn log(&self, msg: String) {
         const formatted = self.format_log(msg);
         self.out.write(formatted);
     }

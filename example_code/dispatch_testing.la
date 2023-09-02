@@ -1,0 +1,123 @@
+extension Printable {
+    fn print_me(self); // takes a copy of self
+    fn print_me(&self); // takes a ref of self
+    fn print_me(); // static
+
+    fn asdf(&self,a: i32): i32;
+}
+
+// in LLVM IR
+/*
+
+@__lumina_PrintableVTable_lumina__ = type {
+    i8*, ; print_me pointer, underlying function takes an object pointer and returns void
+    i8*, ; asdf pointer, underlying function takes an object pointer, an i32, and returns void
+}
+
+@__lumina_PrintableObject_lumina__ = type {
+    i8*, ; inner
+    i8*, ; vtable
+}
+
+define void @__lumina_print_thing_lumina__(@__lumina_PrintableObject_lumina__* %printable) {
+    %inner_ptr = getelementptr @__lumina_PrintableObject_lumina__, @__lumina_PrintableObject_lumina__* %printable, i32 0, i32 0 ; stores address of inner
+    %vtable_ptr = getelementptr @__lumina_PrintableObject_lumina__, @__lumina_PrintableObject_lumina__* %printable, i32 0, i32 1 ; stores address of vtable
+
+    %inner = load i8*, i8** %inner_ptr ; this is the address of the actual inner object in memory
+    %vtable = load i8*, i8** %vtable_ptr ; this is the address of the actual vtable in memory
+
+    %print_me_func_ptr = getelementptr i8*, i8* %vtable, i32 0 ; this is the address of the function, known as a function pointer
+    %print_me_func = bitcast i8* %print_me_func_ptr to void (i8*)*
+
+    call void %print_me_func(i8* %inner) ; call print me with the inner pointer
+
+    %asdf_func_ptr = getelementptr i8*, i8* %vtable, i32 1 ; this is the address of the function, known as a function pointer
+    %asdf_func = bitcast i8* %asdf_func_ptr to i32 (i8*, i32)*
+
+    %asdf_return = call i32 %asdf_func(i8* %inner, i32 43) ; call asdf with the inner pointer, the constant 43, and stores the return value
+    
+    ret void
+}
+
+*/
+
+// This creates struct PrintableVTable<T: Printable> { print_me: (&T):void, asdf: (&T,i32):i32 }
+// and struct PrintableObject<T: Printable>  { inner: &T, vtable: &PrintableVTable }
+
+struct SomeData {
+    x: i32;
+}
+
+extend SomeData {
+    fn some_func(&self, ...){...} // converts to __lumina_SomeData_some_func_lumina__
+}
+
+extend SomeData with Printable {
+    fn print_me(&const self) { // converts to __lumina_SomeData_Printable_print_me_lumina__
+        std::printf("Me: %d\n", self.x);
+    }
+}
+
+// Extension pointer is okay because the pointer is Sized.
+fn print_thing(printable: &Printable) {
+    printable.print_me();
+    // ^ This will have to do a vtable lookup and call that function
+
+    // Printable -> struct { inner: &ConcretePrintable, vtable: &struct { destructor: &():void, print_me: &(&const SomeData):void } }
+    // ~ roughly what happens behind the scenes: printable.vtable.print_me(printable.inner);
+
+    // ILLEGAL, EVEN THOUGH `printable` WILL ALWAYS MEET THE `Printable` REQUIREMENT
+    // IT WILL NOT BE KNOWN AT COMPILE TIME AND THEREFORE NOT STATIC.
+    generic_print_thing(printable);
+}
+
+// Fancy static dispatch. Will be known at compile time so no reference needed.
+// ALSO, accepts anything which is into printable.
+fn generic_print_thing<T: Printable>(printable: T) {
+    printable.print_me();
+    // ^ This turns into the correct static call at compile time.
+}
+
+fn generic_print_stringable<T: std::String>(str: T) {
+    std::printf("String: %s\n", str);
+}
+
+extend SomeData with Into<String> {
+    fn into(&self): String {
+        return std::sprintf("<x: %d>", self.x);
+    }
+}
+
+fn main(argc: u16, argv: [&str]) {
+    const myData = SomeData { x: 100 };
+    myData.print_me(); // STATIC DISPATCH, EASY
+    // ^ calls __lumina_SomeData_Printable_print_me_lumina__
+
+    print_thing(&myData); // DYNAMIC DISPATCH, HARDER
+    // this becomes
+    // print_thing(Printable { inner: &myData, vtable: PrintableVTable { print_me: &myData.print_me } })
+
+    generic_print_stringable(myData.into());
+}
+
+
+
+
+
+
+
+
+
+
+const myData = SomeData { x: 100 };
+myData.x += 10; // INVALID, myData is const
+
+// const myDataPtr = &myData; // INVALID, myData is const, can't take non cost reference to it
+const myDataPtr: &const SomeData = &const myData;
+// myDataPtr = &someOtherData; // INVALID, myDataPtr is const
+myDataPtr.x += 10; // INVALID, myDataPtr is a const ptr
+
+fn doSomethingWithConstPtr(ptr: &const SomeData) { ... }
+
+doSomethingWithConstPtr(myDataPtr); // OK
+doSomethingWithConstPtr(someNonConstPtr); // OK, COERCE TO CONST PTR (NOT THE OTHER WAY AROUND OF COURSE
