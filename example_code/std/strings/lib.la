@@ -1,0 +1,31 @@
+// this is in std::strings
+
+// litstr is primative for string literal
+// e.g. `const my_string_literal = "some string literal";`
+
+export struct String: From(litstr) {
+    data: std::vec(i8);
+}
+
+interface From(T) {
+    fn from(other: T): Self; // Self refers to concrete type of implementor
+}
+
+fn String::from(other: T): String {
+}
+
+struct int_ptr {
+    ptr: *i32;
+}
+
+fn get_int_addr(): int_ptr {
+    var a = 10;
+    var iptr = int_ptr { ptr: &a };
+    return iptr;
+}
+
+fn call_the_function() {
+    var bad_ptr_struct = get_int_addr();
+
+    var val_of_ptr = *(bad_ptr_struct.ptr); // THIS SHOULD BE ILLEGAL
+}

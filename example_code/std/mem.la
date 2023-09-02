@@ -1,0 +1,40 @@
+__extern fn malloc(size: u32): &unknown as __malloc;
+__extern fn free(ptr: *unknown): void;
+
+export fn <T> malloc(): &T {
+    static size = @sizeof(T)
+    return __malloc(size) as &T; // NOTE: MAYBE NOT THIS
+}
+
+export fn <T> free(ptr: T) {
+    __free(ptr);
+}
+
+
+export struct Box<T> {
+    ptr: &T;
+}
+
+extend Box<T> {
+    fn new(val: T): Box<T> {
+        return Box<T> {
+            ptr: std::mem::malloc<T>()
+        };
+    }
+    
+    fn inner(&self): &T {
+        return self.ptr;
+    }
+}
+
+extend Box<T> with IntoRef<T> {
+    fn into_ref(): &T {
+        return self.ptr;
+    }
+}
+
+extend Box<T> with std::extensions::common::Disposable {
+    fn dispose(&self) {
+        std::mem::free<T>(self.ptr);
+    }
+}

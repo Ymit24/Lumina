@@ -11,6 +11,44 @@ struct Complex[X, Y, Z] {
     z: Z
 }
 
+package std::ops {
+
+    interface Add(T) {
+        fn Add(other: T): T;
+    }
+
+}
+
+package std {
+    struct vec(T) {
+        data: *T,
+        len: u32,
+    }
+
+    fn vec(T)::new(): vec(T) {
+        return . {
+            data: std::malloc(@Size(T), 10),
+            len: 10,
+        }
+    }
+}
+
+package std::strings {
+    struct string : Add(string) {
+        str: *i8,
+        len: u32,
+    }
+
+    /// NOTE: THIS KIND OF SUCKS
+    fn string::Add(other: string): string {
+        const newString := string::with_length(self.len + other.len);
+        std::memcpy(newString.str, self.str);
+        std::memcpy(newString.str + self.len, other.str);
+    }
+}
+
+
+
 Complex(i32, Complex(i32, i32, i32), string) getSomeComplex() {
 }
 

@@ -1,0 +1,117 @@
+/// Marks that anything which extends with Vec<T> must also
+/// extend with From<[T]>.
+export extension Vec<T> : From<[T]> {
+    fn push_front(&self, val: T);
+    fn push_back(&self, val: T);
+
+    fn pop_front(&self): T;
+    fn pop_back(&self): T;
+    
+    fn peek_first(&self): &T;
+    fn peek_last(&self): &T;
+}
+
+export struct SimpleVec<T> {
+    data: &[T];
+    len: u32;
+    cap: u32;
+};
+
+extend SimpleVec<T> {
+    fn new(): SimpleVec(T) {
+        SimpleVec(T) {
+            data: std::mem::malloc<[T; 10]>(),
+            len: 0,
+            cap: 10,
+        }
+    }
+
+    fn new_boxed(): std::mem::Box<SimpleVec(T)> {
+        return std::mem::Box<SimpleVec<T>>::new(
+            SimpleVec<T>::new()
+        );
+    }
+
+    fn grow(&self) {
+        const new_data_ptr = std::mem::malloc<[T]>();
+
+        self.cap += 10;
+
+        self.data = new_data_ptr;
+    }
+}    
+
+extend SimpleVec<T> with Disposable {
+    fn dispose(&self) {
+        std::mem::free<&[T]>(self.data);
+    }
+}
+
+extend SimpleVec<T> with Vec<T> {
+    fn push_back(&self, val: T) {
+        if (self.len == self.cap) {
+            self.grow();
+        }
+
+        self.data[self.len++] = val;
+    }
+    
+    fn push_front(&self, val: T) {
+        if (self.len == self.cap) {
+            self.grow();
+        }
+
+        var index = self.len;
+        loop {
+            if index == 0 {
+                break;
+            }
+            
+            self.data[index] = self.data[index-1];
+        }
+        self.len += 1;
+
+        self.data[0] = val;
+    }
+
+    fn pop_front(&self): T { @unimplemented("placeholder"); }
+    fn pop_back(&self): T {
+        @unimplemented("placeholder");
+    }
+    
+    fn peek_first(&self): &T {
+        @unimplemented("placeholder");
+    }
+    fn peek_last(&self): &T {
+        @unimplemented("placeholder");
+    }
+}
+
+extend SimpleVec<T> with From<[T]> {
+    fn from(val: [T]): SimpleVec<T> {
+        const vec = SimpleVec<T>::new();
+        var index = 0;
+        loop {
+            if index >= val.len {
+                break;
+            }
+            vec.push_back(val[index]);
+            index += 1;
+        }
+    }
+}
+
+// test code
+/*
+import { Vec, SimpleVec } from std::vec;
+import { Boxed } from std::mem;
+import { StringUtf8 } from std::string;
+
+fn main() {
+    const slice_lit = [1, 2, 3]; // implicitly [i32; 3]
+    const val = [
+        "Christian".into<StringUtf8>(),
+    ]; // implicitly [StringUtf8; 1]
+    const names = SimpleVec<StringUtf8>::from(vals);
+}
+*/

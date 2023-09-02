@@ -1,0 +1,21 @@
+import std;
+
+extension Logger {
+    fn log(msg: std::string);
+}
+
+
+struct AppLogger {
+    out: stream(string);
+}
+
+extend AppLogger {
+    fn format_log(&self, msg: String): String;
+}
+
+extend AppLogger with Logger {
+    fn log(&self, msg: string) {
+        const formatted = self.format_log(msg);
+        self.out.write(formatted);
+    }
+}

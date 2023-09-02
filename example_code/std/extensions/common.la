@@ -1,0 +1,54 @@
+export extension Disposable {
+    fn dispose(&self);
+}
+
+export extension From<T> {
+    fn from(other: T): @self;
+}
+
+export extension IntoRef<T> {
+    fn into_ref(&self): &T;
+}
+
+export struct With<T> {
+    value: std::mem::Box<T>;
+}
+
+extend With<T> with From<T> {
+    fn from(other: T): With<T> {
+        return With<T> {
+            value: std::mem::Box<T>::new(other),
+        };
+    }
+}
+
+extend With<T> with Into<T> {
+    fn into(&self): T {
+        return *self.value.into_ref();
+    }
+}
+
+// test code
+/*
+struct Foo {}
+extend Foo with Bar {
+    fn do_bar_stuff(&self);
+}
+
+fn do_thing_with_bar(thing_with_bar: With<Bar>) {
+    // ...
+    const bar_ref: &Bar = thing_with_bar.inner;
+
+    bar_ref.do_bar_stuff();
+}
+
+fn other_do_thing_with_just_bar(bar: Bar) {
+    ...
+}
+
+fn main() {
+    const with_bar: With<Bar> = With<Bar>::from(Foo {});
+    other_do_thing_with_just_bar(with_bar);
+}
+
+*/
