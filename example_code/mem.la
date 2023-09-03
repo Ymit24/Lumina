@@ -1,0 +1,199 @@
+import { Optional } from std::extensions;
+
+type size_t = u64;
+
+struct MemoryBlockHeader {
+	size: size_t;
+	is_free: bool;
+	next: Optional<&MemoryBlockHeader>;
+}
+
+extend MemoryBlockHeader {
+	fn new(size: size_t): MemoryBlockHeader {
+		return MemoryBlockHeader {
+			size,
+			is_free: false,
+			next: .None,
+		};
+	}
+}
+
+struct MemoryBlock {
+	header: MemoryBlockHeader;
+	content: [u8];
+}
+
+
+// THIS COULD STILL CAUSE ISSUES IF COMPILING ON WINDOWS
+__extern sbrk(size: u64): &i8;
+
+static FreeHead: Optional<&MemoryBlockHeader> = .None;
+
+export fn malloc<T>(): Optional<&T> {
+	return malloc(@sizeof(T)).inner_as_ref_of<T>();
+}
+
+export fn calloc<T>(elements: size_t): Optional<&[T]> {
+	return calloc(@sizeof(T), elements).inner_as_ref_of<[T]>;
+}
+
+export fn realloc<T>(original: &[T], new_size: size_t): Optional<&[T]> {
+	return realloc_raw(original as &[u8], new_size).inner_as_ref_of<[T]>();
+}
+
+/// Example possible impl
+extend<T,Q> Optional<&T> {
+	fn inner_as(&self): Optional<&Q> {
+		return case self {
+			.Some { value }: { return .Some((&value) as &Q); },
+			.None: { return .None; }
+		};
+	}
+}
+
+export fn malloc_raw(size: size_t): Optional<&[u8]> {
+	if size == 0 { return .None; }
+	
+	// TODO: Reuse existing blocks
+	
+	const new_block_size = @sizeof(MemoryBlockHeader) + size;
+	
+	const block_ptr = if @OS_LINUX || @OS_DARWIN {
+		return sbrk(new_block_size) as &MemoryBlock;
+	} else {
+		@panic("Unsupported OS.");
+	}
+	
+	block_ptr.header = MemoryBlockHeader::new(size);
+	return .Some(&block_ptr.content);
+}
+
+export fn realloc_raw(original: &[u8], new_size: size_t): Optional<&[u8]> {
+	// TODO: Try to reuse an existing block
+	
+	const original_block_ptr = (original - @sizeof(MemoryBlockHeader)) as &MemoryBlock;
+	if original_block_ptr.header.size == new_size {
+		return original; // Size didn't change
+	}
+	
+	const new_block_content_optional = malloc_raw(new_size);
+	case new_block_content {
+		.None { return .None; }
+	}
+	const new_block_content = new_block_content_optional.inner();
+	const new_block_ptr = (new_block_content - @sizeof(MemoryBlockHeader)) as &MemoryBlock;
+	
+	memcpy(original, new_block_content, original_block_ptr.header.size);
+	free(original);
+	
+	return .Some (new_block_content);
+}
+
+/// Note: this does NOT zero memory
+export fn calloc_raw(element_size: size_t, element_count: size_t): Optional<&[u8]> {
+	return malloc_raw(element_size * element_count);
+}
+
+export fn memcpy(from: &[u8], to: &[u8], size: size_t) {
+	foreach i in std::iterators::range::from(0, size) {
+		to[i] = from[i];
+	}
+}
+
+export fn free_raw(content: &[u8]) {
+	const block_ptr = (content - @sizeof(MemoryBlockHeader)) as &MemoryBlock;
+	block_ptr.header.is_free = false; // This marks the block as free, so it can be reused.
+	
+	// TODO: Release to OS if edge block
+}
+
+
+fn test_malloc(): bool {
+	import { malloc, calloc, realloc, free } from std::memory;
+	
+	type SomeObject = struct {
+		x: u64;
+		y: f32;
+		z: i16;
+	};
+	
+	const someObjectPtr: &SomeObject = malloc_raw(@sizeof(SomeObject)) as &SomeObject;
+	defer free(someObjectPtr);
+	
+	someObjectPtr.y = 10;
+	
+	const dynArry = calloc<i32>(10); // type is &[i32]
+	defer free_raw(dynArray);
+	dynArray[1] = 10;
+	
+	const newDynArry = realloc_raw(dynArray, 20); // type is still &[i32]
+	defer free_raw(newDynArry);
+}
+
+struct Vec<T> {
+	len: size_t;
+	cap: size_t;
+	data: &[T];
+}
+
+extend Vec<T> {
+	fn new(): Vec<T> {
+		static init_cap = 10;
+		const data: &[T] = case calloc<T>(init_cap) {
+			.None { @panic("Failed to allocate data for vec!"); },
+			.Some { value }: { return value; },
+		};
+		
+		return Vec<T> {
+			len: 0,
+			cap: init_cap,
+			data
+		};
+	}
+	
+	fn grow(&self) {
+		case self.try_grow() {
+			.Failure: {
+				@panic("Failed to realloc data for vec!");
+			}
+		}
+	}
+	
+	fn push(&self, data: T) {
+		case self.try_push(data) {
+			.Failure: {
+				@panic("Failed to push data to vec!");
+			}
+		}
+	}
+	
+	fn try_grow(&self): Faillable {
+		const try_realloc = realloc(self.data, self.cap + 10);
+		case try_realloc {
+			.None { return .Failure; },
+		};
+		
+		self.data = try_realloc.unwrap();
+		self.cap += 10;
+		return .Success;
+	}
+	
+	fn try_push(&self, data: T): Faillable {
+		if self.len == self.cap {
+			case self.try_grow() {
+				.Failure { return .Failure; }
+			}
+		}
+		
+		self.data[self.len] = data;
+		self.len += 1;
+		
+		return .Success;
+	}
+}
+
+extend Vec<T> with Disposable {
+	fn dispose(&self) {
+		free(self.data);
+	}
+}
