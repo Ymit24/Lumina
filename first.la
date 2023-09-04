@@ -6,7 +6,8 @@ struct ComplexData { inner: Data }
 
 fn main() {
     var myData: Data = Data { x: 100, y: 200.5 + 3 };
-    const nestedData: ComplexData = ComplexData { inner: Data { x: 300, y: 100.2 - 5.5 } };
+    const complex: ComplexData = ComplexData { inner: Data { x: 2, y: 3.5 } };
+    const a: i32 = complex.inner.x;
     return;
 }
 

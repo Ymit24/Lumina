@@ -19,15 +19,18 @@ entry:
 	%8 = alloca %ComplexData
 	%9 = alloca %Data
 	%10 = getelementptr %Data, %Data* %9, i32 0, i32 0
-	store i32 300, i32* %10
-	%11 = fsub float 0x40590CCCC0000000, 5.5
-	%12 = getelementptr %Data, %Data* %9, i32 0, i32 1
-	store float %11, float* %12
-	%13 = load %Data, %Data* %9
-	%14 = getelementptr %ComplexData, %ComplexData* %8, i32 0, i32 0
-	store %Data %13, %Data* %14
-	%15 = load %ComplexData, %ComplexData* %8
-	store %ComplexData %15, %ComplexData* %7
+	store i32 2, i32* %10
+	%11 = getelementptr %Data, %Data* %9, i32 0, i32 1
+	store float 3.5, float* %11
+	%12 = load %Data, %Data* %9
+	%13 = getelementptr %ComplexData, %ComplexData* %8, i32 0, i32 0
+	store %Data %12, %Data* %13
+	%14 = load %ComplexData, %ComplexData* %8
+	store %ComplexData %14, %ComplexData* %7
+	%15 = alloca i32
+	%16 = load %Data, %!s(<nil>)
+	%17 = bitcast %Data %16 to i32
+	store i32 %17, i32* %15
 	ret void
 }
 
