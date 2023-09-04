@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/alecthomas/participle/v2/lexer"
-	"github.com/golang-collections/collections/stack"
 	"github.com/kr/pretty"
 	"github.com/llir/llvm/ir"
 	"github.com/llir/llvm/ir/constant"
@@ -16,19 +15,19 @@ import (
 type CodeGenerator struct {
 	module                   *ir.Module
 	rootFunctionDeclarations map[string]*ir.Func
-	scopeStack               stack.Stack
+	scopeStack               Stack[Scope]
 }
 
 func (c *CodeGenerator) currentBlock() *ir.Block {
 	return c.currentScope().GeneratingBlock
 }
 
-func (c *CodeGenerator) currentScope() Scope {
-	return c.scopeStack.Peek().(Scope)
+func (c *CodeGenerator) currentScope() *Scope {
+	return c.scopeStack.Peek()
 }
 
 func NewCodeGenerator() CodeGenerator {
-	var scopeStack stack.Stack
+	scopeStack := NewStack[Scope]()
 	scopeStack.Push(Scope{
 		Type:             Global,
 		Variables:        make(map[string]Variable),
@@ -166,7 +165,9 @@ func (c *CodeGenerator) VisitBlock(blk *CodeBlock) {
 }
 
 func (c *CodeGenerator) VisitStatement(stmt *Statement) {
-	if stmt.VariableAssignment != nil {
+	if stmt.VariableDeclaration != nil {
+		c.VisitVariableDeclaration(stmt.VariableDeclaration)
+	} else if stmt.VariableAssignment != nil {
 		c.VisitVariableAssignment(stmt.VariableAssignment)
 	} else if stmt.FunctionCall != nil {
 		c.VisitFunctionCall(stmt.FunctionCall)
@@ -216,14 +217,14 @@ func (c *CodeGenerator) VisitTerm(term *Term) value.Value {
 			constValue := constant.NewCharArrayFromString(
 				fixString(*lit.String) + "\x00",
 			)
-			gblDef := c.module.NewGlobalDef("fmt", constValue)
+			gblDef := c.module.NewGlobalDef("fmt"+lit.Pos.String(), constValue)
 			return gblDef
 		} else if lit.Ident != nil {
-			variable, ok := c.currentScope().Variables[*lit.Ident]
-			if !ok {
+			variable, err := c.getVariable(*lit.Ident)
+			if err != nil {
 				CompileError(
 					lit.Pos,
-					fmt.Errorf("Variable `%s` not found in scope!", *lit.Ident),
+					err,
 				)
 			}
 			return c.currentScope().GeneratingBlock.NewLoad(variable.Type, variable.Address)
@@ -259,10 +260,12 @@ func (c *CodeGenerator) VisitExpression(expr *Expression) value.Value {
 			rightIsFloat := types.IsFloat(right.Type())
 			if leftIsFloat || rightIsFloat {
 				if !leftIsFloat {
-					left = cBlock.NewBitCast(left, types.Float)
+					left = cBlock.NewSIToFP(left, types.Float)
+					// left = cBlock.NewBitCast(left, types.Float)
 				}
 				if !rightIsFloat {
-					right = cBlock.NewBitCast(right, types.Float)
+					right = cBlock.NewSIToFP(right, types.Float)
+					// right = cBlock.NewBitCast(right, types.Float)
 				}
 				return cBlock.NewFAdd(
 					left,
@@ -278,6 +281,14 @@ func (c *CodeGenerator) VisitExpression(expr *Expression) value.Value {
 			leftIsFloat := types.IsFloat(left.Type())
 			rightIsFloat := types.IsFloat(right.Type())
 			if leftIsFloat || rightIsFloat {
+				if !leftIsFloat {
+					left = cBlock.NewSIToFP(left, types.Float)
+					// left = cBlock.NewBitCast(left, types.Float)
+				}
+				if !rightIsFloat {
+					right = cBlock.NewSIToFP(right, types.Float)
+					// right = cBlock.NewBitCast(right, types.Float)
+				}
 				return cBlock.NewFSub(
 					left,
 					right,
@@ -330,9 +341,38 @@ func (c *CodeGenerator) VisitFunctionCall(stmt *FunctionCall) value.Value {
 		funcDecl,
 	)
 }
+
+func (c *CodeGenerator) getVariable(name string) (Variable, error) {
+	scopeNode := c.scopeStack.PeekNode()
+	fmt.Printf("Checking scope of type: %s\n", scopeNode.value)
+	for scopeNode != nil {
+		variables := scopeNode.value.Variables
+		if _, ok := variables[name]; ok {
+			fmt.Printf("Found variable!\n")
+			return variables[name], nil
+		}
+		fmt.Printf("Didn't find variable in current scope.\n")
+		scopeNode = scopeNode.next
+	}
+	return Variable{}, fmt.Errorf("No variable found by that name in any valid scope!")
+}
+
 func (c *CodeGenerator) VisitVariableAssignment(stmt *VariableAssignment) {
+	cBlock := c.currentBlock()
+	variable, err := c.getVariable(stmt.Name)
+	if err != nil {
+		CompileError(
+			stmt.Pos,
+			fmt.Errorf("Trying to assign to undeclared variable!"),
+		)
+	}
+	value := c.VisitExpression(&stmt.Expression)
+	cBlock.NewStore(value, variable.Address)
+}
+
+func (c *CodeGenerator) VisitVariableDeclaration(stmt *VariableDeclaration) {
 	fmt.Printf(
-		"Found variable assignment of mutability %s and name %s\n",
+		"Found variable declaration of mutability %s and name %s\n",
 		stmt.Mutability,
 		stmt.Name,
 	)

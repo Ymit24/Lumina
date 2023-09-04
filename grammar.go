@@ -80,27 +80,33 @@ type FunctionArgument struct {
 	Type Type   `Colon @@`
 }
 type Statement struct {
-	Pos                lexer.Position
-	VariableAssignment *VariableAssignment `( @@`
-	Return             *Return             `| @@`
-	ScopeBlock         *CodeBlock          `| @@`
-	StructDefinition   *StructDefinition   `| @@`
-	FunctionCall       *FunctionCall       `| @@ ) Semicolon`
+	Pos                 lexer.Position
+	VariableDeclaration *VariableDeclaration `( @@`
+	VariableAssignment  *VariableAssignment  `| @@`
+	Return              *Return              `| @@`
+	StructDefinition    *StructDefinition    `| @@`
+	FunctionCall        *FunctionCall        `| @@ ) Semicolon`
+	ScopeBlock          *CodeBlock           `| @@`
 }
 type Return struct {
 	Expression *Expression `Return (@@)?`
 }
-type VariableAssignment struct {
+type VariableDeclaration struct {
 	Pos        lexer.Position
 	Mutability string     `@(Static | Const | Var)`
 	Name       string     `@Ident`
 	Type       *Type      `(Colon @@ )?`
 	Expression Expression `Equals @@`
 }
+type VariableAssignment struct {
+	Pos        lexer.Position
+	Name       string     `@Ident`
+	Expression Expression `Equals @@`
+}
 type FunctionCall struct {
 	Pos          lexer.Position
 	FunctionName string       `@Ident`
-	Args         []Expression `LParen ( @@ (Comma @@)* )? RParen`
+	Args         []Expression `LParen ( @@ (Comma @@)* Comma? )? RParen`
 }
 type Expression struct {
 	Pos    lexer.Position
@@ -128,7 +134,7 @@ type StructInstantiation struct {
 }
 type StructInstantiationBody struct {
 	Pos    lexer.Position
-	Fields []StructFieldInstantiation `LBrace @@ ( Comma @@ )* RBrace`
+	Fields []StructFieldInstantiation `LBrace @@ ( Comma @@ )* Comma? RBrace`
 }
 type Literal struct {
 	Pos    lexer.Position

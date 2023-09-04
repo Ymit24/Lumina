@@ -15,6 +15,10 @@ const (
 	CodeBlockScope // e.g. anon blocks
 )
 
+func (s ScopeType) String() string {
+	return [...]string{"Global", "FunctionScope", "ControlScope", "CodeBlockScope"}[s-1]
+}
+
 type Scope struct {
 	Type             ScopeType
 	Variables        map[string]Variable
