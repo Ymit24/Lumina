@@ -157,3 +157,17 @@ func (lit *Literal) IsFloat() bool {
 	}
 	return *lit.Number != math.Trunc(*lit.Number)
 }
+
+func GetStructLLVMTypes(fields []*StructFieldDefinition) ([]types.Type, error) {
+	var types []types.Type
+	for _, field := range fields {
+		llvmType, err := GetLLVMType(field.Type)
+		if err != nil {
+			return nil, err
+		}
+
+		types = append(types, llvmType)
+	}
+
+	return types, nil
+}

@@ -14,30 +14,34 @@ import (
 )
 
 type CodeGenerator struct {
-	module        *ir.Module
-	functionStack stack.Stack
-	blockStack    stack.Stack
-	scopeStack    stack.Stack
-}
-
-func (c *CodeGenerator) currentFunction() *ir.Func {
-	return c.functionStack.Peek().(*ir.Func)
+	module                   *ir.Module
+	rootFunctionDeclarations map[string]*ir.Func
+	scopeStack               stack.Stack
 }
 
 func (c *CodeGenerator) currentBlock() *ir.Block {
-	return c.blockStack.Peek().(*ir.Block)
+	return c.currentScope().GeneratingBlock
 }
 
 func (c *CodeGenerator) currentScope() Scope {
 	return c.scopeStack.Peek().(Scope)
 }
 
-var functionDeclarations map[string]*ir.Func
+func NewCodeGenerator() CodeGenerator {
+	var scopeStack stack.Stack
+	scopeStack.Push(Scope{
+		Type:             Global,
+		Variables:        make(map[string]Variable),
+		StructDefintions: make(map[string]types.Type),
+	})
+	return CodeGenerator{
+		scopeStack:               scopeStack,
+		rootFunctionDeclarations: make(map[string]*ir.Func),
+	}
+}
 
 func (c *CodeGenerator) VisitProgram(p *Program) string {
 	c.module = ir.NewModule()
-
-	functionDeclarations = make(map[string]*ir.Func)
 
 	for _, stmt := range p.Statements {
 		c.VisitHighLevelStatement(stmt)
@@ -55,6 +59,44 @@ func (c *CodeGenerator) VisitHighLevelStatement(stmt *HighLevelStatement) {
 	if stmt.Function != nil {
 		c.VisitFunction(stmt.Function)
 	}
+	if stmt.Struct != nil {
+		c.VisitStructDefinition(stmt.Struct)
+	}
+}
+
+func (c *CodeGenerator) VisitStructDefinition(structDefinition *StructDefinition) {
+	llvmTypes, err := GetStructLLVMTypes(structDefinition.Body.Fields)
+	if err != nil {
+		CompileError(
+			structDefinition.Pos,
+			fmt.Errorf(
+				"Failed to get llvm types for struct definition '%s'. Error: %s",
+				structDefinition.Name,
+				err.Error(),
+			),
+		)
+	}
+	structType := types.NewStruct(llvmTypes...)
+	// TODO: MAKE SURE THE NAME IS ALWAYS UNIQUE. THIS NEEDS TO HANDLE
+	// TOP LEVEL STRUCTS, LOCAL STRUCTS, ANON STRUCTS, GENERICS, ETC...
+	structTypeDef := c.module.NewTypeDef(structDefinition.Name, structType)
+
+	c.currentScope().StructDefintions[structDefinition.Name] = structTypeDef
+}
+
+func (c *CodeGenerator) NewScope(scopeType ScopeType, generatingBlock *ir.Block) {
+	var generatingBlockToUse *ir.Block
+	if generatingBlock == nil {
+		generatingBlockToUse = c.currentScope().GeneratingBlock
+	} else {
+		generatingBlockToUse = generatingBlock
+	}
+	c.scopeStack.Push(Scope{
+		Type:             scopeType,
+		Variables:        make(map[string]Variable),
+		StructDefintions: make(map[string]types.Type),
+		GeneratingBlock:  generatingBlockToUse,
+	})
 }
 
 func (c *CodeGenerator) VisitExtern(stmt *Extern) {
@@ -97,7 +139,7 @@ func (c *CodeGenerator) VisitFunctionSignature(sig *FunctionSignature) *ir.Func 
 	)
 	funcDecl.Sig.Variadic = isVariadic
 
-	functionDeclarations[name] = funcDecl
+	c.rootFunctionDeclarations[name] = funcDecl
 	return funcDecl
 }
 
@@ -108,28 +150,19 @@ func (c *CodeGenerator) VisitFunction(stmt *Function) {
 		pretty.Formatter(stmt.Signature.Args),
 	)
 	fn := c.VisitFunctionSignature(&stmt.Signature)
+	functionBlock := fn.NewBlock("entry")
 
-	c.functionStack.Push(fn)
-	c.scopeStack.Push(Scope{
-		Variables: make(map[string]Variable),
-	})
-	c.VisitBlock(&stmt.Block, "entry")
+	c.NewScope(FunctionScope, functionBlock)
+
+	c.VisitBlock(&stmt.Block)
 	c.scopeStack.Pop()
-	c.functionStack.Pop()
 }
 
-func (c *CodeGenerator) VisitBlock(blk *CodeBlock, name string) {
-	fmt.Printf("Found code block.\n")
-	cFunc := c.functionStack.Peek().(*ir.Func)
-
-	block := cFunc.NewBlock(name)
-	c.blockStack.Push(block)
-
+// NOTE: In GENERAL, code blocks do not actually correspond to new llvm blocks.
+func (c *CodeGenerator) VisitBlock(blk *CodeBlock) {
 	for _, stmt := range blk.Statements {
 		c.VisitStatement(&stmt)
 	}
-
-	c.blockStack.Pop()
 }
 
 func (c *CodeGenerator) VisitStatement(stmt *Statement) {
@@ -139,6 +172,23 @@ func (c *CodeGenerator) VisitStatement(stmt *Statement) {
 		c.VisitFunctionCall(stmt.FunctionCall)
 	} else if stmt.Return != nil {
 		c.VisitReturn(stmt.Return)
+	} else if stmt.ScopeBlock != nil {
+		c.NewScope(CodeBlockScope, nil)
+		c.scopeStack.Push(Scope{
+			Type:      CodeBlockScope,
+			Variables: make(map[string]Variable),
+			// Scope blocks inherit their generating block
+			GeneratingBlock: c.currentScope().GeneratingBlock,
+		})
+		c.VisitBlock(stmt.ScopeBlock)
+		c.scopeStack.Pop()
+	} else if stmt.StructDefinition != nil {
+		c.VisitStructDefinition(stmt.StructDefinition)
+	} else {
+		CompileError(
+			stmt.Pos,
+			fmt.Errorf("Unknown statement type."),
+		)
 	}
 }
 
@@ -176,7 +226,9 @@ func (c *CodeGenerator) VisitTerm(term *Term) value.Value {
 					fmt.Errorf("Variable `%s` not found in scope!", *lit.Ident),
 				)
 			}
-			return c.currentBlock().NewLoad(variable.Type, variable.Address)
+			return c.currentScope().GeneratingBlock.NewLoad(variable.Type, variable.Address)
+		} else if lit.Struct != nil {
+			fmt.Printf("Found struct literal %# v\n", pretty.Formatter(lit.Struct))
 		}
 		CompileError(
 			term.Factor.Literal.Pos,
@@ -191,7 +243,7 @@ func (c *CodeGenerator) VisitTerm(term *Term) value.Value {
 }
 
 func (c *CodeGenerator) VisitExpression(expr *Expression) value.Value {
-	cBlock := c.blockStack.Peek().(*ir.Block)
+	cBlock := c.currentScope().GeneratingBlock
 	left := c.VisitTerm(&expr.Term)
 	if expr.AddSub != nil {
 		// NOTE: For NOW, addition is between ints or floats
@@ -254,9 +306,9 @@ func (c *CodeGenerator) VisitExpression(expr *Expression) value.Value {
 
 func (c *CodeGenerator) VisitFunctionCall(stmt *FunctionCall) value.Value {
 	fmt.Printf("Found function call for function: %s\n", stmt.FunctionName)
-	cBlock := c.currentBlock()
+	cBlock := c.currentScope().GeneratingBlock
 
-	funcDecl, ok := functionDeclarations[stmt.FunctionName]
+	funcDecl, ok := c.rootFunctionDeclarations[stmt.FunctionName]
 	if !ok {
 		CompileError(
 			stmt.Pos,
@@ -321,7 +373,8 @@ func (c *CodeGenerator) VisitVariableAssignment(stmt *VariableAssignment) {
 		)
 	}
 
-	alloc := c.currentBlock().NewAlloca(llvmType)
+	cBlock := c.currentScope().GeneratingBlock
+	alloc := cBlock.NewAlloca(llvmType)
 	variable := Variable{
 		Name:       stmt.Name,
 		Mutability: stmt.Mutability,
@@ -343,13 +396,14 @@ func (c *CodeGenerator) VisitVariableAssignment(stmt *VariableAssignment) {
 
 	exprResult := c.VisitExpression(&stmt.Expression)
 	if exprResult.Type() != alloc.ElemType {
-		exprResult = c.currentBlock().NewBitCast(exprResult, alloc.ElemType)
+		exprResult = cBlock.NewBitCast(exprResult, alloc.ElemType)
 	}
-	c.currentBlock().NewStore(exprResult, alloc)
+	cBlock.NewStore(exprResult, alloc)
 }
+
 func (c *CodeGenerator) VisitReturn(stmt *Return) {
 	fmt.Printf("Found return.\n")
-	cBlock := c.currentBlock()
+	cBlock := c.currentScope().GeneratingBlock
 
 	if stmt.Expression != nil {
 		val := c.VisitExpression(stmt.Expression)

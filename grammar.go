@@ -9,8 +9,32 @@ type Program struct {
 
 type HighLevelStatement struct {
 	Pos      lexer.Position
-	Extern   *Extern   `@@`
-	Function *Function `| @@`
+	Extern   *Extern           `@@`
+	Function *Function         `| @@`
+	Struct   *StructDefinition `| @@`
+}
+
+type StructDefinition struct {
+	Pos  lexer.Position
+	Name string     `Struct @Ident` // TODO: ADD GENERICS
+	Body StructBody `@@`
+}
+
+type StructBody struct {
+	Pos    lexer.Position
+	Fields []*StructFieldDefinition `LBrace ( @@ ( Comma @@ )* )? RBrace`
+}
+
+type StructFieldDefinition struct {
+	Pos  lexer.Position
+	Name string `@Ident`
+	Type Type   `Colon @@`
+}
+
+type StructFieldInstantiation struct {
+	Pos        lexer.Position
+	Name       string     `@Ident`
+	Expression Expression `Colon @@`
 }
 
 type Extern struct {
@@ -59,6 +83,8 @@ type Statement struct {
 	Pos                lexer.Position
 	VariableAssignment *VariableAssignment `( @@`
 	Return             *Return             `| @@`
+	ScopeBlock         *CodeBlock          `| @@`
+	StructDefinition   *StructDefinition   `| @@`
 	FunctionCall       *FunctionCall       `| @@ ) Semicolon`
 }
 type Return struct {
@@ -68,7 +94,7 @@ type VariableAssignment struct {
 	Pos        lexer.Position
 	Mutability string     `@(Static | Const | Var)`
 	Name       string     `@Ident`
-	Type       *Type      `Colon ( @@ )?`
+	Type       *Type      `(Colon @@ )?`
 	Expression Expression `Equals @@`
 }
 type FunctionCall struct {
@@ -95,19 +121,30 @@ type Value struct {
 	FunctionCall *FunctionCall `| @@`
 	Literal      *Literal      `| @@`
 }
+type StructInstantiation struct {
+	Pos  lexer.Position
+	Name string                  `@Ident`
+	Body StructInstantiationBody `@@`
+}
+type StructInstantiationBody struct {
+	Pos    lexer.Position
+	Fields []StructFieldInstantiation `LBrace @@ ( Comma @@ )* RBrace`
+}
 type Literal struct {
 	Pos    lexer.Position
-	Number *float64 `@Number`
-	Ident  *string  `| @Ident`
-	String *string  `| @String`
-	Bool   *bool    `| ( @True | @False )`
-	Nil    bool     `| @Nil` // NOTE: might be wrong
+	Number *float64             `@Number`
+	Struct *StructInstantiation `| @@`
+	Ident  *string              `| @Ident`
+	String *string              `| @String`
+	Bool   *bool                `| ( @True | @False )`
+	Nil    bool                 `| @Nil` // NOTE: might be wrong
 }
 
 var luminaLexer = lexer.MustSimple([]lexer.SimpleRule{
 	{"Ellipsis", `\.\.\.`},
 	{"Fn", `fn`},
 	{"Extern", `extern`},
+	{"Struct", `struct`},
 	{"Static", `static`},
 	{"Const", `const`},
 	{"Var", `var`},

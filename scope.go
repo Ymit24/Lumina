@@ -1,12 +1,26 @@
 package main
 
 import (
+	"github.com/llir/llvm/ir"
 	"github.com/llir/llvm/ir/types"
 	"github.com/llir/llvm/ir/value"
 )
 
+type ScopeType int
+
+const (
+	Global ScopeType = iota
+	FunctionScope
+	ControlScope   // Catch all for if, for, case, etc..
+	CodeBlockScope // e.g. anon blocks
+)
+
 type Scope struct {
-	Variables map[string]Variable
+	Type             ScopeType
+	Variables        map[string]Variable
+	StructDefintions map[string]types.Type
+	// This is the llvm block to use
+	GeneratingBlock *ir.Block
 }
 
 type Variable struct {

@@ -40,7 +40,7 @@ func main() {
 
 	fmt.Println("Visiting")
 
-	codeGenerator := CodeGenerator{}
+	codeGenerator := NewCodeGenerator()
 
 	code := codeGenerator.VisitProgram(program)
 
