@@ -1,21 +1,15 @@
 extern fn printf(fmt: ...[i8]): i32;
 
-struct Data { x: i32 }
+struct Data { x: i32, y: f32 }
+
+struct ComplexData { inner: Data }
 
 fn main() {
-    struct NewData { x: i32 };
-    var a = 4 + 4.5;
-    printf("A original: %f\n", a);
-    var c: f32 = a + 20.0;
-    printf("A changed: %f\n", c);
-    {
-        var b = 20;
-        printf("B: %d\n", b);
-    }
-    printf("A sum=%2.2f\nsecond=%1.2f\n", a, 2.2+2);
+    var myData: Data = Data { x: 100, y: 200.5 + 3 };
+    const nestedData: ComplexData = ComplexData { inner: Data { x: 300, y: 100.2 - 5.5 } };
     return;
 }
 
-fn getNum(a: i32): i32 {
-    return 2 + 1 - 3 + 10;
+fn getData(): Data {
+    return Data { x: 200, y: 3.5 };
 }
