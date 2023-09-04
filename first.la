@@ -1,8 +1,18 @@
 extern fn printf(fmt: ...[i8]): i32;
 
+struct Data { x: i32 }
+
 fn main() {
-    var a := 4 + 4.5;
-    printf("sum=%2.2f\nsecond=%1.2f\n", a, 2.2+2);
+    struct NewData { x: i32 };
+    var a = 4 + 4.5;
+    printf("A original: %f\n", a);
+    var c: f32 = a + 20.0;
+    printf("A changed: %f\n", c);
+    {
+        var b = 20;
+        printf("B: %d\n", b);
+    }
+    printf("A sum=%2.2f\nsecond=%1.2f\n", a, 2.2+2);
     return;
 }
 
