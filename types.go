@@ -19,9 +19,9 @@ var PrimativeTypes = map[string]types.Type{
 	"f32": types.Float,
 }
 
-func GetLLVMType(raw Type) (types.Type, error) {
+func (c *CodeGenerator) GetLLVMType(raw Type) (types.Type, error) {
 	if raw.Array != nil {
-		inner, err := GetLLVMType(raw.Array.Type)
+		inner, err := c.GetLLVMType(raw.Array.Type)
 		if err != nil {
 			return nil, err
 		}
@@ -35,7 +35,12 @@ func GetLLVMType(raw Type) (types.Type, error) {
 	}
 	primative, ok := PrimativeTypes[typeName]
 	if !ok {
-		return nil, fmt.Errorf("Type: `%# v` is not implemented!", raw)
+		// Assume it is a struct and try and get the definition
+		structDefinition, err := c.getStructDefinition(typeName)
+		if err != nil {
+			return nil, fmt.Errorf("Type: `%# v` is not implemented!", raw)
+		}
+		return structDefinition.TypeDef, nil
 	}
 	if raw.Array != nil {
 		return types.NewPointer(primative), nil
@@ -158,10 +163,10 @@ func (lit *Literal) IsFloat() bool {
 	return *lit.Number != math.Trunc(*lit.Number)
 }
 
-func GetStructLLVMTypes(fields []*StructFieldDefinition) ([]types.Type, error) {
+func (c *CodeGenerator) GetStructLLVMTypes(fields []*StructFieldDefinition) ([]types.Type, error) {
 	var types []types.Type
 	for _, field := range fields {
-		llvmType, err := GetLLVMType(field.Type)
+		llvmType, err := c.GetLLVMType(field.Type)
 		if err != nil {
 			return nil, err
 		}

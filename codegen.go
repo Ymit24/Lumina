@@ -31,7 +31,7 @@ func NewCodeGenerator() CodeGenerator {
 	scopeStack.Push(Scope{
 		Type:             Global,
 		Variables:        make(map[string]Variable),
-		StructDefintions: make(map[string]types.Type),
+		StructDefintions: make(map[string]Struct),
 	})
 	return CodeGenerator{
 		scopeStack:               scopeStack,
@@ -64,7 +64,7 @@ func (c *CodeGenerator) VisitHighLevelStatement(stmt *HighLevelStatement) {
 }
 
 func (c *CodeGenerator) VisitStructDefinition(structDefinition *StructDefinition) {
-	llvmTypes, err := GetStructLLVMTypes(structDefinition.Body.Fields)
+	llvmTypes, err := c.GetStructLLVMTypes(structDefinition.Body.Fields)
 	if err != nil {
 		CompileError(
 			structDefinition.Pos,
@@ -80,7 +80,17 @@ func (c *CodeGenerator) VisitStructDefinition(structDefinition *StructDefinition
 	// TOP LEVEL STRUCTS, LOCAL STRUCTS, ANON STRUCTS, GENERICS, ETC...
 	structTypeDef := c.module.NewTypeDef(structDefinition.Name, structType)
 
-	c.currentScope().StructDefintions[structDefinition.Name] = structTypeDef
+	var structFields []string
+	for _, field := range structDefinition.Body.Fields {
+		structFields = append(structFields, field.Name)
+	}
+
+	c.currentScope().StructDefintions[structDefinition.Name] = Struct{
+		Name:          structDefinition.Name,
+		TypeDef:       structTypeDef,
+		StructDef:     structType,
+		OrderedFields: structFields,
+	}
 }
 
 func (c *CodeGenerator) NewScope(scopeType ScopeType, generatingBlock *ir.Block) {
@@ -93,7 +103,7 @@ func (c *CodeGenerator) NewScope(scopeType ScopeType, generatingBlock *ir.Block)
 	c.scopeStack.Push(Scope{
 		Type:             scopeType,
 		Variables:        make(map[string]Variable),
-		StructDefintions: make(map[string]types.Type),
+		StructDefintions: make(map[string]Struct),
 		GeneratingBlock:  generatingBlockToUse,
 	})
 }
@@ -110,7 +120,7 @@ func (c *CodeGenerator) VisitFunctionSignature(sig *FunctionSignature) *ir.Func 
 	if sig.ReturnType == nil {
 		returnType = types.Void
 	} else {
-		returnType, err = GetLLVMType(*sig.ReturnType)
+		returnType, err = c.GetLLVMType(*sig.ReturnType)
 		if err != nil {
 			CompileError(sig.ReturnType.Pos, err)
 		}
@@ -118,7 +128,7 @@ func (c *CodeGenerator) VisitFunctionSignature(sig *FunctionSignature) *ir.Func 
 	var params []*ir.Param
 	isVariadic := false
 	for _, arg := range sig.Args {
-		argType, err := GetLLVMType(arg.Type)
+		argType, err := c.GetLLVMType(arg.Type)
 		if err != nil {
 			CompileError(arg.Pos, err)
 		}
@@ -230,6 +240,43 @@ func (c *CodeGenerator) VisitTerm(term *Term) value.Value {
 			return c.currentScope().GeneratingBlock.NewLoad(variable.Type, variable.Address)
 		} else if lit.Struct != nil {
 			fmt.Printf("Found struct literal %# v\n", pretty.Formatter(lit.Struct))
+			structType, err := c.getStructDefinition(lit.Struct.Name)
+			if err != nil {
+				CompileError(
+					lit.Struct.Pos,
+					fmt.Errorf(
+						"Failed to instantiate Struct literal. Error: %s\n",
+						err.Error(),
+					),
+				)
+			}
+			fmt.Printf("Found the type of the struct. Creating.\n")
+
+			cBlock := c.currentBlock()
+			structAddress := cBlock.NewAlloca(structType.TypeDef)
+			// NOTE: THIS ASSUMES THAT THE FIELDS ARE IN THE ORDER THEY'RE DEFINED
+			for _, field := range lit.Struct.Body.Fields {
+				currentExpression := c.VisitExpression(&field.Expression)
+				index, err := structType.getFieldIndex(field.Name)
+				if err != nil {
+					CompileError(
+						field.Pos,
+						fmt.Errorf(
+							"Failed to get field index. Error: %s\n",
+							err.Error(),
+						),
+					)
+				}
+				currentFieldAddress := cBlock.NewGetElementPtr(
+					structType.TypeDef,
+					structAddress,
+					constant.NewIndex(constant.NewInt(types.I32, 0)),
+					constant.NewIndex(constant.NewInt(types.I32, index)),
+				)
+				// castedElementAddress := cBlock.NewBitCast(currentFieldAddress, types.NewPointer(structType.StructDef.Fields[index]))
+				cBlock.NewStore(currentExpression, currentFieldAddress)
+			}
+			return cBlock.NewLoad(structType.TypeDef, structAddress)
 		}
 		CompileError(
 			term.Factor.Literal.Pos,
@@ -344,7 +391,6 @@ func (c *CodeGenerator) VisitFunctionCall(stmt *FunctionCall) value.Value {
 
 func (c *CodeGenerator) getVariable(name string) (Variable, error) {
 	scopeNode := c.scopeStack.PeekNode()
-	fmt.Printf("Checking scope of type: %s\n", scopeNode.value)
 	for scopeNode != nil {
 		variables := scopeNode.value.Variables
 		if _, ok := variables[name]; ok {
@@ -355,6 +401,20 @@ func (c *CodeGenerator) getVariable(name string) (Variable, error) {
 		scopeNode = scopeNode.next
 	}
 	return Variable{}, fmt.Errorf("No variable found by that name in any valid scope!")
+}
+
+func (c *CodeGenerator) getStructDefinition(name string) (Struct, error) {
+	scopeNode := c.scopeStack.PeekNode()
+	for scopeNode != nil {
+		structDefinitions := scopeNode.value.StructDefintions
+		if _, ok := structDefinitions[name]; ok {
+			fmt.Printf("Found struct definition!\n")
+			return structDefinitions[name], nil
+		}
+		fmt.Printf("Didn't find struct definition in current scope.\n")
+		scopeNode = scopeNode.next
+	}
+	return Struct{}, fmt.Errorf("No struct definition found by that name in any valid scope!")
 }
 
 func (c *CodeGenerator) VisitVariableAssignment(stmt *VariableAssignment) {
@@ -400,7 +460,7 @@ func (c *CodeGenerator) VisitVariableDeclaration(stmt *VariableDeclaration) {
 			pretty.Formatter(stmt.Expression),
 		)
 	} else {
-		llvmType, err = GetLLVMType(*stmt.Type)
+		llvmType, err = c.GetLLVMType(*stmt.Type)
 	}
 	if err != nil {
 		CompileError(stmt.Pos, err)
