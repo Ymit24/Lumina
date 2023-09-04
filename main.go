@@ -33,7 +33,7 @@ func main() {
 	program, err := parser.ParseString(inputFilename, contents, participle.Trace(os.Stdout))
 
 	if err != nil {
-		fmt.Printf("Error: %s\n", err.Error())
+		panic(fmt.Sprintf("Error: %s\n", err.Error()))
 	} else {
 		fmt.Printf("Query: %# v\n", pretty.Formatter(program))
 	}

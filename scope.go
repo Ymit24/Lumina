@@ -36,6 +36,15 @@ type Variable struct {
 	Address    value.Value
 }
 
+func (v *Variable) IsStruct() bool {
+	if _, ok := v.Type.(*types.StructType); ok {
+		fmt.Printf("Variable is struct! %s\n", v.Name)
+		return true
+	}
+	fmt.Printf("Variable is NOT a struct! %s\n", v.Name)
+	return false
+}
+
 type Struct struct {
 	Name          string
 	TypeDef       types.Type

@@ -229,14 +229,16 @@ func (c *CodeGenerator) VisitTerm(term *Term) value.Value {
 			)
 			gblDef := c.module.NewGlobalDef("fmt"+lit.Pos.String(), constValue)
 			return gblDef
-		} else if lit.Ident != nil {
-			variable, err := c.getVariable(*lit.Ident)
+		} else if lit.FieldIdent != nil {
+			fmt.Printf("\n\nFOUND FIELD IDENT\n\n")
+			variable, err := c.getVariablePath(*&lit.FieldIdent.Path)
 			if err != nil {
 				CompileError(
 					lit.Pos,
 					err,
 				)
 			}
+			fmt.Printf("FINISHED TYPE: %# v\n", variable.Type)
 			return c.currentScope().GeneratingBlock.NewLoad(variable.Type, variable.Address)
 		} else if lit.Struct != nil {
 			fmt.Printf("Found struct literal %# v\n", pretty.Formatter(lit.Struct))
@@ -389,6 +391,76 @@ func (c *CodeGenerator) VisitFunctionCall(stmt *FunctionCall) value.Value {
 	)
 }
 
+func (c *CodeGenerator) getVariablePath(path []string) (Variable, error) {
+	root, err := c.getVariable(path[0])
+	if err != nil {
+		return Variable{}, fmt.Errorf(
+			"Failed to find root variable in field identifier. Error: %s",
+			err.Error(),
+		)
+	}
+
+	if root.IsStruct() == false && len(path) > 1 {
+		return Variable{}, fmt.Errorf(
+			"Trying to get field out of non struct variable. Name: %s.",
+			root.Name,
+		)
+	}
+
+	structType := root.Type.(*types.StructType)
+
+	structDefinition, err := c.getStructDefinition(structType.TypeName)
+	if err != nil {
+		return Variable{}, fmt.Errorf(
+			"Failed to get struct definition for variable. Error: %s",
+			err.Error(),
+		)
+	}
+	fmt.Printf("Struct Type for Variable: %# v\n", structDefinition)
+
+	currentPathIndex := 1
+	currentStructDefinition := structDefinition
+
+	for currentPathIndex < len(path) {
+		index, err := currentStructDefinition.getFieldIndex(path[currentPathIndex])
+		if err != nil {
+			return Variable{}, fmt.Errorf(
+				"Failed to find path element in struct. Error %s",
+				err.Error(),
+			)
+		}
+		fieldType := currentStructDefinition.StructDef.Fields[index]
+		if currentPathIndex < len(path)-1 {
+			if _, ok := fieldType.(*types.StructType); !ok {
+				return Variable{}, fmt.Errorf(
+					"Path element was non struct before end of path.",
+				)
+			}
+			currentPathIndex += 1
+			fieldStructType, _ := fieldType.(*types.StructType)
+			currentStructDefinition, err = c.getStructDefinition(fieldStructType.TypeName)
+			if err != nil {
+				return Variable{}, fmt.Errorf(
+					"Failed to get struct defintion for field in path. Error: %s",
+					err.Error(),
+				)
+			}
+		} else {
+			// TODO: GET ELEMENT POINTER TO THIS AND SET THE ADDRESS
+			// TODO: CAPTURE MUTABILITY
+			return Variable{
+				Name: currentStructDefinition.OrderedFields[index],
+				Type: fieldType,
+			}, nil
+		}
+	}
+
+	fmt.Printf(
+		"Successfully found the innermost struct defintion for the path! Found %s.\n",
+		currentStructDefinition,
+	)
+	return Variable{}, nil
+}
 func (c *CodeGenerator) getVariable(name string) (Variable, error) {
 	scopeNode := c.scopeStack.PeekNode()
 	for scopeNode != nil {

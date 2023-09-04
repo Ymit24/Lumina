@@ -137,13 +137,18 @@ type StructInstantiationBody struct {
 	Fields []StructFieldInstantiation `LBrace @@ ( Comma @@ )* Comma? RBrace`
 }
 type Literal struct {
-	Pos    lexer.Position
-	Number *float64             `@Number`
-	Struct *StructInstantiation `| @@`
-	Ident  *string              `| @Ident`
-	String *string              `| @String`
-	Bool   *bool                `| ( @True | @False )`
-	Nil    bool                 `| @Nil` // NOTE: might be wrong
+	Pos        lexer.Position
+	Number     *float64             `@Number`
+	Struct     *StructInstantiation `| @@`
+	FieldIdent *FieldIdent          `| @@`
+	String     *string              `| @String`
+	Bool       *bool                `| ( @True | @False )`
+	Nil        bool                 `| @Nil` // NOTE: might be wrong
+}
+
+type FieldIdent struct {
+	Pos  lexer.Position
+	Path []string `@Ident ( Dot @Ident )*`
 }
 
 var luminaLexer = lexer.MustSimple([]lexer.SimpleRule{
