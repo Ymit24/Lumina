@@ -8,3 +8,4 @@ link_and_compile:
 	clang first.o -o executable -lm
 run_bin:
 	./executable
+all: build_lumina run_example link_and_compile run_bin

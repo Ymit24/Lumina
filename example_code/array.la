@@ -1,0 +1,43 @@
+export struct Column {
+    @default root: std::vec<std::box<Element>>,
+}
+
+struct Signal<T> {
+    inner: T,
+    onMutate: fn(new:T:),
+}
+
+extend<T> Signal<T> with Accessor {
+    fn access(&const self): T {
+        return self.inner;
+    }
+} and with Mutate<T> {
+    fn mutate(&self, new: T) {
+        self.inner = new;
+    }
+}
+
+fn main() {
+    const app = App::new();
+    var clicker = Signal<i32>::from(0.2);
+
+    const rootView = View {
+        Column {
+            Text::new("You've clicked ${} times", clicker),
+            Button {
+                "Click",
+                onClick: fn () {
+                    clicker += 1;
+                }
+            },
+            Input {
+                "Reset counter to",
+                onChange: fn (value: i32) {
+                    clicker = value;
+                }
+            }
+        }
+    };
+
+    app.start(rootView);
+}

@@ -100,7 +100,7 @@ type VariableDeclaration struct {
 }
 type VariableAssignment struct {
 	Pos        lexer.Position
-	Name       string     `@Ident`
+	Ident      FieldIdent `@@`
 	Expression Expression `Equals @@`
 }
 type FunctionCall struct {

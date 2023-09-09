@@ -238,7 +238,7 @@ func (c *CodeGenerator) VisitTerm(term *Term) value.Value {
 					err,
 				)
 			}
-			fmt.Printf("FINISHED TYPE: %# v\n", variable.Type)
+			fmt.Printf("FINISHED TYPE: %# v. Address: %# v\n", variable.Type, variable.Address)
 			return c.currentScope().GeneratingBlock.NewLoad(variable.Type, variable.Address)
 		} else if lit.Struct != nil {
 			fmt.Printf("Found struct literal %# v\n", pretty.Formatter(lit.Struct))
@@ -275,7 +275,6 @@ func (c *CodeGenerator) VisitTerm(term *Term) value.Value {
 					constant.NewIndex(constant.NewInt(types.I32, 0)),
 					constant.NewIndex(constant.NewInt(types.I32, index)),
 				)
-				// castedElementAddress := cBlock.NewBitCast(currentFieldAddress, types.NewPointer(structType.StructDef.Fields[index]))
 				cBlock.NewStore(currentExpression, currentFieldAddress)
 			}
 			return cBlock.NewLoad(structType.TypeDef, structAddress)
@@ -332,11 +331,9 @@ func (c *CodeGenerator) VisitExpression(expr *Expression) value.Value {
 			if leftIsFloat || rightIsFloat {
 				if !leftIsFloat {
 					left = cBlock.NewSIToFP(left, types.Float)
-					// left = cBlock.NewBitCast(left, types.Float)
 				}
 				if !rightIsFloat {
 					right = cBlock.NewSIToFP(right, types.Float)
-					// right = cBlock.NewBitCast(right, types.Float)
 				}
 				return cBlock.NewFSub(
 					left,
@@ -407,6 +404,13 @@ func (c *CodeGenerator) getVariablePath(path []string) (Variable, error) {
 		)
 	}
 
+	if len(path) == 1 {
+		return root, nil
+	}
+
+	var indexes []value.Value
+	indexes = append(indexes, constant.NewIndex(constant.NewInt(types.I32, 0)))
+
 	structType := root.Type.(*types.StructType)
 
 	structDefinition, err := c.getStructDefinition(structType.TypeName)
@@ -429,6 +433,7 @@ func (c *CodeGenerator) getVariablePath(path []string) (Variable, error) {
 				err.Error(),
 			)
 		}
+		indexes = append(indexes, constant.NewIndex(constant.NewInt(types.I32, index)))
 		fieldType := currentStructDefinition.StructDef.Fields[index]
 		if currentPathIndex < len(path)-1 {
 			if _, ok := fieldType.(*types.StructType); !ok {
@@ -448,9 +453,12 @@ func (c *CodeGenerator) getVariablePath(path []string) (Variable, error) {
 		} else {
 			// TODO: GET ELEMENT POINTER TO THIS AND SET THE ADDRESS
 			// TODO: CAPTURE MUTABILITY
+			fmt.Printf("Indexes: %# v", indexes)
+			address := c.currentBlock().NewGetElementPtr(structType, root.Address, indexes...)
 			return Variable{
-				Name: currentStructDefinition.OrderedFields[index],
-				Type: fieldType,
+				Name:    currentStructDefinition.OrderedFields[index],
+				Type:    fieldType,
+				Address: address,
 			}, nil
 		}
 	}
@@ -459,7 +467,10 @@ func (c *CodeGenerator) getVariablePath(path []string) (Variable, error) {
 		"Successfully found the innermost struct defintion for the path! Found %s.\n",
 		currentStructDefinition,
 	)
-	return Variable{}, nil
+	return Variable{
+		Name: currentStructDefinition.Name,
+		Type: currentStructDefinition.TypeDef,
+	}, nil
 }
 func (c *CodeGenerator) getVariable(name string) (Variable, error) {
 	scopeNode := c.scopeStack.PeekNode()
@@ -490,14 +501,16 @@ func (c *CodeGenerator) getStructDefinition(name string) (Struct, error) {
 }
 
 func (c *CodeGenerator) VisitVariableAssignment(stmt *VariableAssignment) {
+	fmt.Printf("Found variable assignment!\n")
 	cBlock := c.currentBlock()
-	variable, err := c.getVariable(stmt.Name)
+	variable, err := c.getVariablePath(stmt.Ident.Path)
 	if err != nil {
 		CompileError(
 			stmt.Pos,
 			fmt.Errorf("Trying to assign to undeclared variable!"),
 		)
 	}
+	fmt.Printf("Found variable by path: %# v\n", variable)
 	value := c.VisitExpression(&stmt.Expression)
 	cBlock.NewStore(value, variable.Address)
 }

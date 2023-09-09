@@ -4,10 +4,31 @@ struct Data { x: i32, y: f32 }
 
 struct ComplexData { inner: Data }
 
+struct Epic {
+    i: Data,
+    b: ComplexData,
+    c: ComplexData
+}
+
 fn main() {
     var myData: Data = Data { x: 100, y: 200.5 + 3 };
-    const complex: ComplexData = ComplexData { inner: Data { x: 2, y: 3.5 } };
-    const a: i32 = complex.inner.x;
+    const complex: ComplexData = ComplexData { inner: Data { x: 2, y: 4.5 } };
+    const epic: Epic = Epic {
+        i: Data {
+            x: 20,
+            y: 10.25
+        },
+        b: ComplexData {
+            inner: Data {
+                x: 0,
+                y: 10.25 + 2
+            }
+        },
+        c: complex
+    };
+    printf("Value: %f\n", complex.inner.y);
+    complex.inner.y = 10.5;
+    printf("Value: %f\n", complex.inner.y);
     return;
 }
 
