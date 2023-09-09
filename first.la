@@ -11,12 +11,17 @@ struct Epic {
 }
 
 fn getData(): Data {
-    return Data { x: 200, y: 100.5 };
+    return Data { x: 201, y: 100.5 };
+}
+
+fn doSomethingWithData(i: i32, x: i32): i32 {
+    return i + x;
 }
 
 fn main() {
     var myData: Data = getData();
     printf("Data: %d %f\n", myData.x, myData.y);
+    printf("Done something with data: %d\n", doSomethingWithData(myData.x, doSomethingWithData(myData.x, 1)));
     const complex: ComplexData = ComplexData { inner: Data { x: 2, y: 4.5 } };
     const epic: Epic = Epic {
         i: Data {

@@ -1,0 +1,8 @@
+struct Token {
+    data: std::string
+}
+
+fn tokenize(input: std::string): std::vec<Token> {
+    if input.substring(0,2) == "if" {
+    }
+}

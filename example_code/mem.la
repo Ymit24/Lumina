@@ -95,7 +95,7 @@ export fn calloc_raw(element_size: size_t, element_count: size_t): Optional<&[u8
 }
 
 export fn memcpy(from: &[u8], to: &[u8], size: size_t) {
-	foreach i in std::iterators::range::from(0, size) {
+	for i in std::iterators::range::from(0, size) {
 		to[i] = from[i];
 	}
 }

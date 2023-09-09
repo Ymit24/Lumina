@@ -33,6 +33,7 @@ type Variable struct {
 	Name       string
 	Mutability string
 	Type       types.Type
+	Value      value.Value
 	Address    value.Value
 }
 

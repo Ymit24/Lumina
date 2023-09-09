@@ -1,0 +1,21 @@
+export struct Buffer<W: u16, H: u16> {
+    glyphs: [[Glyph; W]; H]
+}
+
+extend<W: u16, H: u16> Buffer<W,H> {
+    fn new(): Buffer<W,H> {
+        return Buffer {};
+    }
+
+    fn width(): u16 { return W; }
+    fn height(): u16 { return H; }
+
+    fn write(glyph: Glyph, x: u16, y: u16) {
+        glyphs[y][x] = glyph;
+    }
+}
+
+fn main() {
+    const buffer = Buffer<64, 32>::new();
+    buffer.write(Glyph::from('#'), 0, 0);
+}

@@ -162,6 +162,18 @@ func (c *CodeGenerator) VisitFunction(stmt *Function) {
 	functionBlock := fn.NewBlock("entry")
 
 	c.NewScope(FunctionScope, functionBlock)
+	newScope := c.currentScope()
+
+	for i, arg := range stmt.Signature.Args {
+		argName := arg.Name
+		variable := Variable{
+			Name:  argName,
+			Type:  fn.Params[i].Type(),
+			Value: fn.Params[i],
+		}
+
+		newScope.Variables[argName] = variable
+	}
 
 	c.VisitBlock(&stmt.Block)
 	c.scopeStack.Pop()
@@ -230,7 +242,6 @@ func (c *CodeGenerator) VisitTerm(term *Term) value.Value {
 			gblDef := c.module.NewGlobalDef("fmt"+lit.Pos.String(), constValue)
 			return gblDef
 		} else if lit.FieldIdent != nil {
-			fmt.Printf("\n\nFOUND FIELD IDENT\n\n")
 			variable, err := c.getVariablePath(*&lit.FieldIdent.Path)
 			if err != nil {
 				CompileError(
@@ -238,8 +249,23 @@ func (c *CodeGenerator) VisitTerm(term *Term) value.Value {
 					err,
 				)
 			}
-			fmt.Printf("FINISHED TYPE: %# v. Address: %# v\n", variable.Type, variable.Address)
-			return c.currentScope().GeneratingBlock.NewLoad(variable.Type, variable.Address)
+			if variable.Value != nil {
+				return variable.Value
+			} else if variable.Address != nil {
+				return c.currentScope().GeneratingBlock.NewLoad(
+					variable.Type,
+					variable.Address,
+				)
+			} else {
+				CompileError(
+					lit.Pos,
+					fmt.Errorf(
+						"Failed to get value from Variable! No value or"+
+							"or address associated! Variable: %# v",
+						variable,
+					),
+				)
+			}
 		} else if lit.Struct != nil {
 			fmt.Printf("Found struct literal %# v\n", pretty.Formatter(lit.Struct))
 			structType, err := c.getStructDefinition(lit.Struct.Name)
