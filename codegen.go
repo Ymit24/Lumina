@@ -283,6 +283,9 @@ func (c *CodeGenerator) VisitTerm(term *Term) value.Value {
 			term.Factor.Literal.Pos,
 			fmt.Errorf("Unimplemented literal. Found: %# v", lit),
 		)
+	} else if term.Factor.FunctionCall != nil {
+		fmt.Printf("Visiting function call factor.\n")
+		return c.VisitFunctionCall(term.Factor.FunctionCall)
 	}
 	CompileError(
 		term.Factor.Pos,

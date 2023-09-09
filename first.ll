@@ -2,23 +2,33 @@
 %ComplexData = type { %Data }
 %Epic = type { %Data, %ComplexData, %ComplexData }
 
-@"fmtfirst.la:29:12" = global [11 x i8] c"Value: %f\0A\00"
-@"fmtfirst.la:31:12" = global [11 x i8] c"Value: %f\0A\00"
+@"fmtfirst.la:19:12" = global [13 x i8] c"Data: %d %f\0A\00"
+@"fmtfirst.la:34:12" = global [11 x i8] c"Value: %f\0A\00"
+@"fmtfirst.la:36:12" = global [11 x i8] c"Value: %f\0A\00"
 
 declare i32 @printf(i8* %fmt, ...)
+
+define %Data @getData() {
+entry:
+	%0 = alloca %Data
+	%1 = getelementptr %Data, %Data* %0, i32 0, i32 0
+	store i32 200, i32* %1
+	%2 = getelementptr %Data, %Data* %0, i32 0, i32 1
+	store float 100.5, float* %2
+	%3 = load %Data, %Data* %0
+	ret %Data %3
+}
 
 define void @main() {
 entry:
 	%0 = alloca %Data
-	%1 = alloca %Data
-	%2 = getelementptr %Data, %Data* %1, i32 0, i32 0
-	store i32 100, i32* %2
-	%3 = sitofp i32 3 to float
-	%4 = fadd float 200.5, %3
-	%5 = getelementptr %Data, %Data* %1, i32 0, i32 1
-	store float %4, float* %5
-	%6 = load %Data, %Data* %1
-	store %Data %6, %Data* %0
+	%1 = call %Data @getData()
+	store %Data %1, %Data* %0
+	%2 = getelementptr %Data, %Data* %0, i32 0, i32 0
+	%3 = load i32, i32* %2
+	%4 = getelementptr %Data, %Data* %0, i32 0, i32 1
+	%5 = load float, float* %4
+	%6 = call i32 (i8*, ...) @printf([13 x i8]* @"fmtfirst.la:19:12", i32 %3, float %5)
 	%7 = alloca %ComplexData
 	%8 = alloca %ComplexData
 	%9 = alloca %Data
@@ -62,22 +72,11 @@ entry:
 	store %Epic %34, %Epic* %15
 	%35 = getelementptr %ComplexData, %ComplexData* %7, i32 0, i32 0, i32 1
 	%36 = load float, float* %35
-	%37 = call i32 (i8*, ...) @printf([11 x i8]* @"fmtfirst.la:29:12", float %36)
+	%37 = call i32 (i8*, ...) @printf([11 x i8]* @"fmtfirst.la:34:12", float %36)
 	%38 = getelementptr %ComplexData, %ComplexData* %7, i32 0, i32 0, i32 1
 	store float 10.5, float* %38
 	%39 = getelementptr %ComplexData, %ComplexData* %7, i32 0, i32 0, i32 1
 	%40 = load float, float* %39
-	%41 = call i32 (i8*, ...) @printf([11 x i8]* @"fmtfirst.la:31:12", float %40)
+	%41 = call i32 (i8*, ...) @printf([11 x i8]* @"fmtfirst.la:36:12", float %40)
 	ret void
-}
-
-define %Data @getData() {
-entry:
-	%0 = alloca %Data
-	%1 = getelementptr %Data, %Data* %0, i32 0, i32 0
-	store i32 200, i32* %1
-	%2 = getelementptr %Data, %Data* %0, i32 0, i32 1
-	store float 3.5, float* %2
-	%3 = load %Data, %Data* %0
-	ret %Data %3
 }

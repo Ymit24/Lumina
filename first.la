@@ -10,8 +10,13 @@ struct Epic {
     c: ComplexData
 }
 
+fn getData(): Data {
+    return Data { x: 200, y: 100.5 };
+}
+
 fn main() {
-    var myData: Data = Data { x: 100, y: 200.5 + 3 };
+    var myData: Data = getData();
+    printf("Data: %d %f\n", myData.x, myData.y);
     const complex: ComplexData = ComplexData { inner: Data { x: 2, y: 4.5 } };
     const epic: Epic = Epic {
         i: Data {
@@ -30,8 +35,4 @@ fn main() {
     complex.inner.y = 10.5;
     printf("Value: %f\n", complex.inner.y);
     return;
-}
-
-fn getData(): Data {
-    return Data { x: 200, y: 3.5 };
 }
