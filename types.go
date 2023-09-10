@@ -8,15 +8,16 @@ import (
 )
 
 var PrimativeTypes = map[string]types.Type{
-	"i8":  types.I8,
-	"i16": types.I16,
-	"i32": types.I32,
-	"i64": types.I64,
-	"u8":  types.I8,  // NOTE: Signedness is weird in LLVM
-	"u16": types.I16, // NOTE: Signedness is weird in LLVM
-	"u32": types.I32, // NOTE: Signedness is weird in LLVM
-	"u64": types.I64, // NOTE: Signedness is weird in LLVM
-	"f32": types.Float,
+	"bool": types.I1,
+	"i8":   types.I8,
+	"i16":  types.I16,
+	"i32":  types.I32,
+	"i64":  types.I64,
+	"u8":   types.I8,  // NOTE: Signedness is weird in LLVM
+	"u16":  types.I16, // NOTE: Signedness is weird in LLVM
+	"u32":  types.I32, // NOTE: Signedness is weird in LLVM
+	"u64":  types.I64, // NOTE: Signedness is weird in LLVM
+	"f32":  types.Float,
 }
 
 func (c *CodeGenerator) GetLLVMType(raw Type) (types.Type, error) {

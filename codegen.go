@@ -222,6 +222,7 @@ type ExpressionStep struct {
 
 func fixString(raw string) string {
 	t := strings.ReplaceAll(raw, `\n`, "\n")
+	t = strings.ReplaceAll(t, `\t`, "\t")
 	t = strings.ReplaceAll(t, `"`, "")
 	return t
 }
@@ -304,6 +305,13 @@ func (c *CodeGenerator) VisitTerm(term *Term) value.Value {
 				cBlock.NewStore(currentExpression, currentFieldAddress)
 			}
 			return cBlock.NewLoad(structType.TypeDef, structAddress)
+		} else if lit.Bool != nil {
+			fmt.Printf("Found a bool literal. The value is: %t\n", lit.Bool.IsTrue)
+			if lit.Bool.IsTrue {
+				return constant.True
+			} else {
+				return constant.False
+			}
 		}
 		CompileError(
 			term.Factor.Literal.Pos,

@@ -142,8 +142,13 @@ type Literal struct {
 	Struct     *StructInstantiation `| @@`
 	FieldIdent *FieldIdent          `| @@`
 	String     *string              `| @String`
-	Bool       *bool                `| ( @True | @False )`
+	Bool       *Boolean             `| @@`
 	Nil        bool                 `| @Nil` // NOTE: might be wrong
+}
+
+type Boolean struct {
+	IsTrue  bool `@True`
+	IsFalse bool `| @False`
 }
 
 type FieldIdent struct {

@@ -18,11 +18,21 @@ fn doSomethingWithData(i: i32, x: i32): i32 {
     return i + x;
 }
 
+fn getBool(): bool {
+    return true;
+}
+
+fn pass(v: bool): bool {
+    return v;
+}
+
 fn main() {
     var myData: Data = getData();
     printf("Data: %d %f\n", myData.x, myData.y);
     printf("Done something with data: %d\n", doSomethingWithData(myData.x, doSomethingWithData(myData.x, 1)));
     const complex: ComplexData = ComplexData { inner: Data { x: 2, y: 4.5 } };
+    const flag2 = false;
+    printf("Bool: %d \t %d \t %d\n", flag2, getBool(), pass(true));
     const epic: Epic = Epic {
         i: Data {
             x: 20,
