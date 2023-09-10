@@ -86,7 +86,26 @@ type Statement struct {
 	Return              *Return              `| @@`
 	StructDefinition    *StructDefinition    `| @@`
 	FunctionCall        *FunctionCall        `| @@ ) Semicolon`
+	If                  *IfStatement         `| @@`
 	ScopeBlock          *CodeBlock           `| @@`
+}
+type IfStatement struct {
+	Pos       lexer.Position
+	Condition LogicalExpression `If @@`
+	Codeblock CodeBlock         `@@`
+	ElseIf    *ElseIfStatement  `( @@`
+	Else      *ElseStatement    `| @@ )?`
+}
+type ElseIfStatement struct {
+	Pos       lexer.Position
+	Condition Expression       `Else If @@`
+	Codeblock CodeBlock        `@@`
+	ElseIf    *ElseIfStatement `( @@`
+	Else      *ElseStatement   `| @@ )?`
+}
+type ElseStatement struct {
+	Pos       lexer.Position
+	Codeblock CodeBlock `Else @@`
 }
 type Return struct {
 	Expression *Expression `Return (@@)?`
@@ -107,6 +126,12 @@ type FunctionCall struct {
 	Pos          lexer.Position
 	FunctionName string       `@Ident`
 	Args         []Expression `LParen ( @@ (Comma @@)* Comma? )? RParen`
+}
+type LogicalExpression struct {
+	Pos        lexer.Position
+	Expression Expression         `@@`
+	Operator   *string            `@(EQ | LEQ | GEQ | GTR | LSS | NEQ | AND | OR)?`
+	Other      *LogicalExpression `@@?`
 }
 type Expression struct {
 	Pos    lexer.Position
@@ -165,6 +190,8 @@ var luminaLexer = lexer.MustSimple([]lexer.SimpleRule{
 	{"Const", `const`},
 	{"Var", `var`},
 	{"Return", `return`},
+	{"If", `if`},
+	{"Else", `else`},
 	{"Number", `(\d*\.)?\d+`},
 	{"Dot", `\.`},
 	{"String", `\"(?:[^\"]|\\.)*\"`},
@@ -173,6 +200,14 @@ var luminaLexer = lexer.MustSimple([]lexer.SimpleRule{
 	{"RParen", `\)`},
 	{"LBracket", `\[`},
 	{"RBracket", `\]`},
+	{"EQ", `==`},
+	{"AND", `&&`},
+	{"OR", `\|\|`},
+	{"NEQ", `!=`},
+	{"GEQ", `>=`},
+	{"LEQ", `<=`},
+	{"GTR", `>`},
+	{"LSS", `<`},
 	{"LBrace", `{`},
 	{"RBrace", `}`},
 	{"Colon", `:`},

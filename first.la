@@ -2,52 +2,9 @@ extern fn printf(fmt: ...[i8]): i32;
 
 struct Data { x: i32, y: f32 }
 
-struct ComplexData { inner: Data }
-
-struct Epic {
-    i: Data,
-    b: ComplexData,
-    c: ComplexData
-}
-
-fn getData(): Data {
-    return Data { x: 201, y: 100.5 };
-}
-
-fn doSomethingWithData(i: i32, x: i32): i32 {
-    return i + x;
-}
-
-fn getBool(): bool {
-    return true;
-}
-
-fn pass(v: bool): bool {
-    return v;
-}
-
 fn main() {
-    var myData: Data = getData();
-    printf("Data: %d %f\n", myData.x, myData.y);
-    printf("Done something with data: %d\n", doSomethingWithData(myData.x, doSomethingWithData(myData.x, 1)));
-    const complex: ComplexData = ComplexData { inner: Data { x: 2, y: 4.5 } };
-    const flag2 = false;
-    printf("Bool: %d \t %d \t %d\n", flag2, getBool(), pass(true));
-    const epic: Epic = Epic {
-        i: Data {
-            x: 20,
-            y: 10.25
-        },
-        b: ComplexData {
-            inner: Data {
-                x: 0,
-                y: 10.25 + 2
-            }
-        },
-        c: complex
-    };
-    printf("Value: %f\n", complex.inner.y);
-    complex.inner.y = 10.5;
-    printf("Value: %f\n", complex.inner.y);
+    if true == false && false {
+        printf("True");
+    }
     return;
 }
